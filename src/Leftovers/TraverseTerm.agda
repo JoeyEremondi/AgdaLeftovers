@@ -1,5 +1,5 @@
 {-# OPTIONS --without-K #-}
-module TraverseTerm where
+module Leftovers.TraverseTerm where
 
 open import Data.List
 open import Category.Monad.State
