@@ -37,4 +37,4 @@ p0 (suc n) rewrite p0 n = refl
 
 
 f : Foo
-f = runPartial (findLeftovers makePair)  {!!}
+f =  ► makePair ⇒ ? ◄

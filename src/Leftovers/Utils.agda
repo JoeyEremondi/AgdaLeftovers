@@ -32,14 +32,17 @@ constructors _ = []
 
 
 -- Given a name, get its type
--- and generate _ patterns for each argument
+-- and generate fresh metas for each argument
 -- e.g. turn (a -> b -> c -> d) into [_ , _ , _]
 fully-applied-pattern : Name → TC (List (Arg Pattern))
 fully-applied-pattern nm =
   do
     nmType ← getType nm
-    return (full-app-type nmType)
+    full-app-type nmType
   where
-    full-app-type : Type → List (Arg Pattern)
-    full-app-type (pi (arg info _) (abs s x)) = arg info (var "_") ∷ full-app-type x
-    full-app-type t = []
+    full-app-type : Type → TC (List (Arg Pattern))
+    full-app-type (pi (arg info dom) (abs s x)) = do
+      rec ← full-app-type x
+      hole ← newMeta dom
+      return (arg info ? ∷ rec)
+    full-app-type t = return []

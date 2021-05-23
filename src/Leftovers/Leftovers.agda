@@ -48,9 +48,13 @@ getHoles (makeHoles p) = p
 nthHole : ∀ n {ls} {as : Sets n ls } k → Holes n ls as → Projₙ as k
 nthHole n k h = projₙ n k (getHoles h)
 
+_∥_ : ∀ {n : ℕ} {levels : Levels n} {sets : Sets n levels}
+   {ℓ} {X : Set ℓ} →
+  Holes n levels sets →
+  Holes (suc n) (ℓ , levels) (X , sets)
 
-runPartial : ∀ {ℓ} {n} {ls} {types : Sets n ls} {T : Set ℓ} → (Holes n ls types → T) → Product n types → T
-runPartial f args = f (makeHoles args)
+-- fillHoles : ∀ {ℓ} {n} {ls} {types : Sets n ls} {T : Set ℓ} → (Holes n ls types → T) → Product n types → T
+-- fillHoles f args = f (makeHoles args)
 
 
 -- quoteSets {n = suc n} (x Vec.∷ v) = app (app (quoteTerm (_,_   {A = Set} {B = λ x₁ → Sets n (proj₂ nSet)}  )) x) (quoteSets v)
@@ -63,9 +67,8 @@ record MetaInContext : Set where
     unapplied : Term
     applied : Term
 
-macro
- findLeftovers : (Term → TC ⊤) → Term → TC ⊤
- findLeftovers theMacro goal =
+findLeftovers : (Term → TC ⊤) → Term → TC ⊤
+findLeftovers theMacro goal =
   do
     -- We're producing a function from hole-fills to the goal type
     funType ← inferType goal
@@ -158,3 +161,14 @@ macro
     quoteSets : ∀ {n} → Vec.Vec Term n → Term
     quoteSets Vec.[] = con (quote Level.lift) (vArg (quoteTerm tt) ∷ [])
     quoteSets {n = suc n} (x Vec.∷ v) = (con (quote _,_) (vArg x ∷ vArg (quoteSets v) ∷ [] ))
+
+-- infixr 10 [_⇒_]
+
+withLeftovers : ∀ {ℓ} {n} {ls} {types : Sets n ls} {A : Set ℓ}
+  → (theMacro : Term → TC ⊤)
+  → {@(tactic findLeftovers theMacro) f : Holes n ls types → A}
+  → Holes n ls types
+  → A
+withLeftovers _ {f} x = f x
+
+syntax withLeftovers tac x = ► tac ⇒ x ◄
