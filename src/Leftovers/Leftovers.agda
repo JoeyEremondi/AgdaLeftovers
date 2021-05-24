@@ -48,10 +48,14 @@ getHoles (makeHoles p) = p
 nthHole : ∀ n {ls} {as : Sets n ls } k → Holes n ls as → Projₙ as k
 nthHole n k h = projₙ n k (getHoles h)
 
+infixr 10 _∥_
+
 _∥_ : ∀ {n : ℕ} {levels : Levels n} {sets : Sets n levels}
    {ℓ} {X : Set ℓ} →
-  Holes n levels sets →
+  Holes n levels sets → X →
   Holes (suc n) (ℓ , levels) (X , sets)
+_∥_ {n = zero} {sets = sets} {X = X} holes x = makeHoles x
+_∥_ {n = suc n} {sets = sets} {X = X} holes x = makeHoles (x , getHoles holes)
 
 -- fillHoles : ∀ {ℓ} {n} {ls} {types : Sets n ls} {T : Set ℓ} → (Holes n ls types → T) → Product n types → T
 -- fillHoles f args = f (makeHoles args)
@@ -164,11 +168,10 @@ findLeftovers theMacro goal =
 
 -- infixr 10 [_⇒_]
 
-withLeftovers : ∀ {ℓ} {n} {ls} {types : Sets n ls} {A : Set ℓ}
+by_andAlso : ∀ {ℓ} {n} {ls} {types : Sets n ls} {A : Set ℓ}
   → (theMacro : Term → TC ⊤)
   → {@(tactic findLeftovers theMacro) f : Holes n ls types → A}
-  → Holes n ls types
-  → A
-withLeftovers _ {f} x = f x
+  → Arrows n types A
+by_andAlso {n = n} _ {f} = curryₙ n (λ x → f (makeHoles x))
 
-syntax withLeftovers tac x = ► tac ⇒ x ◄
+-- syntax withLeftovers tac x = ► tac ⇒ x ◄

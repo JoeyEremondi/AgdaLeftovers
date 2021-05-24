@@ -1,4 +1,6 @@
-module Leftovers.Examples where
+-- Like Leftovers.Examples, but more meant to stress-test the library
+-- than to be clear/readable
+module Leftovers.Tests where
 
 open import Leftovers.Leftovers
 open import Leftovers.ByRefl
@@ -11,8 +13,8 @@ open import Relation.Binary.PropositionalEquality
 open import Data.Unit
 open import Data.List
 
+--Make sure findLeftovers works with
 
--- Test for Leftovers
 data Foo : Set(Level.suc Level.zero) where
   Bar : Set → ℕ → ((n : ℕ) → n ≡ n + 0) → Foo
 
@@ -37,4 +39,9 @@ p0 (suc n) rewrite p0 n = refl
 
 
 f : Foo
-f =  ► makePair ⇒ ? ◄
+f =
+  by
+    makePair
+  andAlso
+    p0
+    ℕ

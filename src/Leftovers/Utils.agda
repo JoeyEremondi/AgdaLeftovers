@@ -8,7 +8,7 @@ open import Reflection
 open import Reflection.Term
 open import Reflection.Pattern as P
 open import Reflection.TypeChecking.Monad.Instances
-
+open import Data.Nat
 
 
 case_of_ : ∀ {A B : Set} → A → (A → B) → B
@@ -38,11 +38,11 @@ fully-applied-pattern : Name → TC (List (Arg Pattern))
 fully-applied-pattern nm =
   do
     nmType ← getType nm
-    full-app-type nmType
+    full-app-type nmType 0
   where
-    full-app-type : Type → TC (List (Arg Pattern))
-    full-app-type (pi (arg info dom) (abs s x)) = do
-      rec ← full-app-type x
+    full-app-type : Type → ℕ → TC (List (Arg Pattern))
+    full-app-type (pi (arg info dom) (abs s x)) pos = do
+      rec ← full-app-type x (1 + pos)
       hole ← newMeta dom
-      return (arg info ? ∷ rec)
-    full-app-type t = return []
+      return (arg info (P.var pos) ∷ rec)
+    full-app-type t pos = return []

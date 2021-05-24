@@ -2,7 +2,7 @@
 module Leftovers.ByRefl where
 
 open import Leftovers.Utils
-open import Leftovers.Leftovers
+-- open import Leftovers.Leftovers
 
 
 import Level as Level
@@ -46,7 +46,7 @@ macro
       mk-cls ctor =
          do
            pat <- fully-applied-pattern ctor
-           return (clause [ vArg (con ctor pat) ] (con (quote refl) []))
+           return (clause (List.map (λ _ → ( "_" , vArg unknown )) pat) pat (con (quote refl) []))
 
 ≡-type-info : Term → TC (Arg Term × Arg Term × Term × Term)
 ≡-type-info (def (quote _≡_) (𝓁 ∷ 𝒯 ∷ arg _ l ∷ arg _ r ∷ [])) = return (𝓁 , 𝒯 , l , r)
