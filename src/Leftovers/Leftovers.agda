@@ -92,9 +92,9 @@ findLeftovers theMacro goal =
 
     -- Run the given macro in the extended context
     funBody <- extendContext (vArg productType) do
-      goalType ← case goalAbs of λ
-        { (abs _ goalType) → return goalType }
-      body <- newMeta goalType
+      -- goalType ← case goalAbs of λ
+      --   { (abs _ goalType) → return goalType }
+      body <- newMeta unknown -- goalType
       theMacro body
 
       --Now we see what holes are left
@@ -168,10 +168,12 @@ findLeftovers theMacro goal =
 
 -- infixr 10 [_⇒_]
 
-by_andAlso : ∀ {ℓ} {n} {ls} {types : Sets n ls} {A : Set ℓ}
+by : ∀ {ℓ} {n} {ls} {types : Sets n ls} {A : Set ℓ}
   → (theMacro : Term → TC ⊤)
   → {@(tactic findLeftovers theMacro) f : Holes n ls types → A}
-  → Arrows n types A
-by_andAlso {n = n} _ {f} = curryₙ n (λ x → f (makeHoles x))
+  → Product n types → A
+by {n = n} _ {f} x = f (makeHoles x)
+
+-- by {n = n} _ {f} = curryₙ n (λ x → f (makeHoles x))
 
 -- syntax withLeftovers tac x = ► tac ⇒ x ◄

@@ -10,6 +10,7 @@ open import Reflection.Pattern as P
 open import Reflection.TypeChecking.Monad.Instances
 open import Data.Nat
 
+open import Data.Unit
 
 case_of_ : ∀ {A B : Set} → A → (A → B) → B
 case x of f = f x
@@ -19,17 +20,25 @@ case x of f = f x
 λh x ↦ body  = lam hidden (abs x body)
 
 
-{- Syntactic sugar for trying a computation, if it fails then try the other one -}
-try-fun : ∀ {a} {A : Set a} → TC A → TC A → TC A
-try-fun = catchTC
+--Try an action (usually unification) but continue without it
+-- if it fails
+try : TC ⊤ → TC ⊤
+try x = catchTC x (return tt)
 
-syntax try-fun t f = try t or-else f
+tryUnify : Term → Term → TC ⊤
+tryUnify x y = try (unify x y)
+
+{- Syntactic sugar for trying a computation, if it fails then try the other one -}
+-- try-fun : ∀ {a} {A : Set a} → TC A → TC A → TC A
+-- try-fun = catchTC
+
+-- syntax try-fun t f = try t or-else f
 
 constructors : Definition → List Name
 constructors (data-type pars cs) = cs
 constructors _ = []
 
-
+import Reflection.Show
 
 -- Given a name, get its type
 -- and generate fresh metas for each argument
@@ -38,6 +47,7 @@ fully-applied-pattern : Name → TC (List (Arg Pattern))
 fully-applied-pattern nm =
   do
     nmType ← getType nm
+    debugPrint "full-app" 2 (strErr "fullApp " ∷ nameErr nm ∷ termErr nmType ∷ [])
     full-app-type nmType 0
   where
     full-app-type : Type → ℕ → TC (List (Arg Pattern))
