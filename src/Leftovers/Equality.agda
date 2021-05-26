@@ -46,10 +46,10 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       -- declareDef (vArg η) holeType
       let retFun = pat-lam clauses []
       normFun ← reduce retFun
-      -- debugPrint "refl-cases" 2 (strErr "reflcases ret" ∷ termErr normFun ∷ [])
+      debugPrint "refl-cases" 2 (strErr "reflcases ret non-norm " ∷ termErr retFun ∷ [])
       unify hole normFun
-      -- normHole ← reduce hole
-      -- debugPrint "refl-cases" 2 (strErr "reflCases final " ∷ termErr normHole ∷ [])
+      normHole ← reduce hole
+      debugPrint "refl-cases" 2 (strErr "reflCases final " ∷ termErr normHole ∷ [])
     where
       -- For each constructor, generate the clause,
       -- along with the metavariable term for its right-hand side
@@ -59,7 +59,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
            patArgs <- fully-applied-pattern ctor
            rhs <- freshMeta unknown
            let teles = (List.map (λ _ → ( "_" , vArg unknown )) patArgs)
-           -- debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
+           debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
            let
              ret =
                (clause
@@ -67,7 +67,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
                  [ vArg (con ctor patArgs) ]
                  rhs)
 
-           -- debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
+           debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
            -- tryUnify rhs (con (quote refl) [])
            pure ret
 

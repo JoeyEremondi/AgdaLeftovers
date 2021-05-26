@@ -71,7 +71,9 @@ record MetaInContext : Set where
     unapplied : Term
     applied : Term
 
-findLeftovers : (Term → TC ⊤) → Term → TC ⊤
+import Leftovers.Monad as L
+
+findLeftovers : (Term → L.Leftovers ⊤) → Term → TC ⊤
 findLeftovers theMacro goal =
   do
     -- We're producing a function from hole-fills to the goal type
@@ -94,27 +96,41 @@ findLeftovers theMacro goal =
     funBody <- extendContext (vArg productType) do
       goalType ← case goalAbs of λ
         { (abs _ goalType) → return goalType }
-      body <- newMeta goalType
-      theMacro body
+      (body , allMetas) ← L.runLeftovers
+        ((L.freshMeta goalType) L.>>=
+        λ hole → theMacro hole L.>> L.pure hole)
+      -- body <- newMeta goalType
+      -- L.runLeftovers (theMacro body)
 
       --Now we see what holes are left
-      normBody <- normalise body
-      debugPrint "Hello" 2 (strErr "MacroBody " ∷ termErr body ∷ [])
-      debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normBody ∷ [])
+      normBody <- normalise body -- body
+      -- debugPrint "Hello" 2 (strErr "MacroBody " ∷ termErr body ∷ [])
+      -- debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normBody ∷ [])
       let
         handleMetas : _ → Meta → Data.Maybe.Maybe MetaInContext
         handleMetas ctx m = just (record
           {context = ctx
           ; unapplied = meta m (vArg (var 0 []) ∷ [])
           ; applied = meta m (vArg (var 0 []) ∷ (List.map proj₂ ctx))}) -- just (record {context = ctx (meta m (vArg (var 0 []) ∷ [])) ?})
-        metas =
-          collectFromSubterms
-            (record
-              { onVar = λ _ _ → nothing
-              ; onMeta = handleMetas
-              ; onCon = λ _ _ → nothing
-              ; onDef = λ _ _ → nothing })
-            normBody
+          --
+      metaList ←
+          forM allMetas λ hole → do
+            nf ← inContext (L.Hole.context hole) (normalise (L.Hole.hole hole))
+            case nf of λ
+              {(meta x args) → return [ Cmeta (List.map (λ x → "arg" , x) (L.Hole.context hole)) (meta x []) (meta x args)   ]
+              ;_ → do
+                let
+                  metas =
+                    collectFromSubterms
+                      (record
+                        { onVar = λ _ _ → nothing
+                        ; onMeta = handleMetas
+                        ; onCon = λ _ _ → nothing
+                        ; onDef = λ _ _ → nothing }) nf
+                return (List.map (λ (Cmeta ctx a b) → Cmeta (ctx List.++ List.map (λ x → "arg" , x) (L.Hole.context hole)) a b) metas)
+              }
+      let
+        metas = List.concat metaList
         indexedMetas = (Vec.zip (Vec.allFin _) (Vec.fromList metas))
 
       -- Now we know how many elements are in our Product
@@ -150,9 +166,9 @@ findLeftovers theMacro goal =
       return body
     --Produce the function that gives the result of the last macro
     unify goal (lam visible (abs "holes" funBody))
-    finalResult ← reduce goal
-    debugPrint "Hello" 2 (strErr "Final Result" ∷ termErr finalResult ∷ [])
-    return tt
+    -- finalResult ← reduce goal
+    -- debugPrint "Hello" 2 (strErr "Final Result" ∷ termErr finalResult ∷ [])
+    -- return tt
 
 
   where
@@ -177,7 +193,7 @@ findLeftovers theMacro goal =
 -- infixr 10 [_⇒_]
 
 by : ∀ {ℓ} {n} {ls} {types : Sets n ls} {A : Set ℓ}
-  → (theMacro : Term → TC ⊤)
+  → (theMacro : Term → L.Leftovers ⊤)
   → {@(tactic findLeftovers theMacro) f : Holes n ls types → A}
   → Product n types → A
 by {n = n} _ {f} x = f (makeHoles x)
