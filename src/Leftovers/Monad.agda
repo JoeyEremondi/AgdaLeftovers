@@ -1,3 +1,4 @@
+{-# OPTIONS --without-K -v 2 #-}
 module Leftovers.Monad where
 
 
@@ -11,8 +12,38 @@ open import Data.List
 import Reflection as TC
 open import Reflection.TypeChecking.Monad.Instances
 
-open TC using (Term ; Type ; Arg ; Name ; Clause ; Pattern ; Definition ; Meta)
+open import Reflection.Abstraction as Abstraction public
+  using (Abs; abs)
+open import Reflection.Argument as Argument public
+  using (Arg; arg; Args; vArg; hArg; iArg)
+open import Reflection.Definition as Definition  public
+  using (Definition)
+open import Reflection.Meta as Meta public
+  using (Meta)
+open import Reflection.Name as Name public
+  using (Name; Names)
+open import Reflection.Literal as Literal public
+  using (Literal)
+open import Reflection.Pattern as Pattern public
+  using (Pattern)
+open import Reflection.Term as Term public
+  using (Term; Type; Clause; Clauses; Sort)
+
+open import Reflection using (ErrorPart ; strErr; termErr ; nameErr) public
+
 open import Data.Bool
+
+import Reflection.Argument.Relevance as Relevance
+import Reflection.Argument.Visibility as Visibility
+import Reflection.Argument.Information as Information
+
+open Definition.Definition public
+open Information.ArgInfo public
+open Literal.Literal public
+open Relevance.Relevance public
+open Term.Term public
+open Visibility.Visibility public
+
 
 private
   variable
@@ -35,21 +66,21 @@ Leftovers : Set ℓ  → Set ℓ
 Leftovers = StateT (Lift _ (List Hole)) TC.TC
 
 
-tacMonad : RawMonad {f = ℓ}  Leftovers
-tacMonad = StateTMonad _ tcMonad
+leftoversMonad : RawMonad {f = ℓ}  Leftovers
+leftoversMonad = StateTMonad _ tcMonad
 
-tacApplicative : RawApplicative {f = ℓ}  Leftovers
-tacApplicative = RawIMonad.rawIApplicative tacMonad
+leftoversApplicative : RawApplicative {f = ℓ}  Leftovers
+leftoversApplicative = RawIMonad.rawIApplicative leftoversMonad
 
-tacFunctor : RawFunctor {ℓ = ℓ}  Leftovers
-tacFunctor = RawIApplicative.rawFunctor tacApplicative
+leftoversFunctor : RawFunctor {ℓ = ℓ}  Leftovers
+leftoversFunctor = RawIApplicative.rawFunctor leftoversApplicative
 
 
-tacMonadZero : RawMonadZero {f = ℓ} Leftovers
-tacMonadZero = StateTMonadZero _ tcMonadZero
+leftoversMonadZero : RawMonadZero {f = ℓ} Leftovers
+leftoversMonadZero = StateTMonadZero _ tcMonadZero
 
-tacMonadPlus : RawMonadPlus {f = ℓ}  Leftovers
-tacMonadPlus = StateTMonadPlus _ tcMonadPlus
+leftoversMonadPlus : RawMonadPlus {f = ℓ}  Leftovers
+leftoversMonadPlus = StateTMonadPlus _ tcMonadPlus
 
 private
 
@@ -70,10 +101,10 @@ private
 -- Monad syntax
 
 returnLeftovers : A → Leftovers A
-returnLeftovers = RawMonad.return tacMonad
+returnLeftovers = RawMonad.return leftoversMonad
 
 bindLeftovers : ∀ {A B : Set ℓ } ->  Leftovers A → (A → Leftovers B)  → Leftovers B
-bindLeftovers a f = RawMonad._=<<_ tacMonad f a
+bindLeftovers a f = RawMonad._=<<_ leftoversMonad f a
 
 pure : A → Leftovers A
 pure = returnLeftovers
@@ -81,7 +112,7 @@ pure = returnLeftovers
 
 infixl 3 _<|>_
 _<|>_ : Leftovers A → Leftovers A → Leftovers A
-_<|>_ = RawIAlternative._∣_ (RawIMonadPlus.alternative tacMonadPlus)
+_<|>_ = RawIAlternative._∣_ (RawIMonadPlus.alternative leftoversMonadPlus)
 {-# INLINE _<|>_ #-}
 
 infixl 1 _>>=_ _>>_ _<&>_
@@ -195,3 +226,36 @@ commitLeftovers = liftTC TC.commitTC
 
 isMacro          : Name → Leftovers Bool
 isMacro = liftTCA1 TC.isMacro
+
+open import Data.Nat
+
+  -- If the argument is 'true' makes the following primitives also normalise
+  -- their results: inferType, checkType, quoteLeftovers, getType, and getContext
+withNormalisation : ∀ {a} {A : Set a} → Bool → Leftovers A → Leftovers A
+withNormalisation flag comp s = TC.withNormalisation flag (comp s)
+
+  -- Prints the third argument if the corresponding verbosity level is turned
+  -- on (with the -v flag to Agda).
+debugPrint : String → ℕ → List TC.ErrorPart → Leftovers ⊤
+debugPrint s n err = liftTC (TC.debugPrint s n err)
+
+  -- Fail if the given computation gives rise to new, unsolved
+  -- "blocking" constraints.
+noConstraints : ∀ {a} {A : Set a} → Leftovers A → Leftovers A
+noConstraints comp s = TC.noConstraints (comp s)
+
+  -- Run the given Leftovers action and return the first component. Resets to
+  -- the old Leftovers state if the second component is 'false', or keep the
+  -- new Leftovers state if it is 'true'.
+runSpeculative : ∀ {a} {A : Set a} → Leftovers (A × Bool) → Leftovers A
+runSpeculative comp oldState =
+  TC.bindTC
+    (TC.runSpeculative (TC.bindTC (comp oldState) λ{((a , flag) , midState) → TC.return (((a , flag) , midState) , flag)}))
+    λ {
+      -- Only keep state if the computation succeeds
+      ((a , false) , newState) → TC.return ((a , oldState)) ;
+      ((a , true) , newState) → TC.return (a , newState)}
+
+runLeftovers : Leftovers A → TC.TC (A × List Hole)
+runLeftovers comp  = TC.bindTC (comp (lift []))
+  ((λ { (a , lift holes) → TC.return (a , holes) }) )

@@ -6,7 +6,7 @@ open import Leftovers.Utils
 
 
 import Level as Level
-open import Reflection
+-- open import Reflection
 open import Reflection.Term
 open import Reflection.Pattern as P
 open import Reflection.TypeChecking.Monad.Instances
@@ -24,8 +24,10 @@ open import Data.Char as Char
 open import Data.String as String
 
 
+open import Leftovers.Monad
+
 import Data.List.Categorical
-open Data.List.Categorical.TraversableM {m = Level.zero} tcMonad
+open Data.List.Categorical.TraversableM {m = Level.zero} leftoversMonad
 
 --This file was adapted from https://github.com/alhassy/gentle-intro-to-reflection
 
@@ -34,7 +36,7 @@ open import Reflection.Show
 
 --Unify the goal with a function that does a case-split on an argument of the type with the given name
 -- Return the metavariables, along with telescopes, for each branch
-cases : Name → Term → TC ⊤
+cases : Name → Term → Leftovers ⊤
 cases typeName hole -- thm-you-hope-is-provable-by-refls
     = do
       -- let η = nom
@@ -44,102 +46,104 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       -- declareDef (vArg η) holeType
       let retFun = pat-lam clauses []
       normFun ← reduce retFun
-      debugPrint "refl-cases" 2 (strErr "reflcases ret" ∷ termErr normFun ∷ [])
+      -- debugPrint "refl-cases" 2 (strErr "reflcases ret" ∷ termErr normFun ∷ [])
       unify hole normFun
-      normHole ← reduce hole
-      debugPrint "refl-cases" 2 (strErr "reflCases final " ∷ termErr normHole ∷ [])
+      -- normHole ← reduce hole
+      -- debugPrint "refl-cases" 2 (strErr "reflCases final " ∷ termErr normHole ∷ [])
     where
       -- For each constructor, generate the clause,
       -- along with the metavariable term for its right-hand side
-      mk-cls : Name → TC (Clause )
+      mk-cls : Name → Leftovers (Clause )
       mk-cls ctor =
          do
            patArgs <- fully-applied-pattern ctor
-           rhs <- newMeta unknown
+           rhs <- freshMeta unknown
            let teles = (List.map (λ _ → ( "_" , vArg unknown )) patArgs)
-           debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
+           -- debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
            let
              ret =
                (clause
                  teles
                  [ vArg (con ctor patArgs) ]
                  rhs)
-           debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
+
+           -- debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
            -- tryUnify rhs (con (quote refl) [])
-           return ret
-
-≡-type-info : Term → TC (Arg Term × Arg Term × Term × Term)
-≡-type-info (def (quote _≡_) (𝓁 ∷ 𝒯 ∷ arg _ l ∷ arg _ r ∷ [])) = return (𝓁 , 𝒯 , l , r)
-≡-type-info _ = typeError [ strErr "Term is not a ≡-type." ]
-
-{- If we have “f $ args” return “f”. -}
-$-head : Term → Term
-$-head (var v args) = var v []
-$-head (con c args) = con c []
-$-head (def f args) = def f []
-$-head (pat-lam cs args) = pat-lam cs []
-$-head t = t
+           pure ret
 
 
 
-import Agda.Builtin.Reflection as Builtin
+-- ≡-type-info : Term → Leftovers (Arg Term × Arg Term × Term × Term)
+-- ≡-type-info (def (quote _≡_) (𝓁 ∷ 𝒯 ∷ arg _ l ∷ arg _ r ∷ [])) = return (𝓁 , 𝒯 , l , r)
+-- ≡-type-info _ = typeError [ strErr "Term is not a ≡-type." ]
 
-_$-≟_ : Term → Term → Bool
-con c args $-≟ con c′ args′ = Builtin.primQNameEquality c c′
-def f args $-≟ def f′ args′ = Builtin.primQNameEquality f f′
-var x args $-≟ var x′ args′ = does (x Nat.≟ x′)
-_ $-≟ _ = false
-
-{- Only gets heads and as much common args, not anywhere deep. :'( -}
-infix 5 _⊓_
-{-# TERMINATING #-} {- Fix this by adding fuel (con c args) ≔ 1 + length args -}
-_⊓_ : Term → Term → Term
-l ⊓ r with l $-≟ r | l | r
-...| false | x | y = unknown
-...| true | var f args | var f′ args′ = var f (List.zipWith (λ{ (arg i!! t) (arg j!! s) → arg i!! (t ⊓ s) }) args args′)
-...| true | con f args | con f′ args′ = con f (List.zipWith (λ{ (arg i!! t) (arg j!! s) → arg i!! (t ⊓ s) }) args args′)
-...| true | def f args | def f′ args′ = def f (List.zipWith (λ{ (arg i!! t) (arg j!! s) → arg i!! (t ⊓ s) }) args args′)
-...| true | ll | _ = ll {- Left biased; using ‘unknown’ does not ensure idempotence. -}
-
-{- ‘unknown’ goes to a variable, a De Bruijn index -}
-unknown-elim : ℕ → List (Arg Term) → List (Arg Term)
-unknown-elim n [] = []
-unknown-elim n (arg i unknown ∷ xs) = arg i (var n []) ∷ unknown-elim (n + 1) xs
-unknown-elim n (arg i (var x args) ∷ xs) = arg i (var (n + suc x) args) ∷ unknown-elim n xs
-unknown-elim n (arg i x ∷ xs)       = arg i x ∷ unknown-elim n xs
-{- Essentially we want: body(unknownᵢ)  ⇒  λ _ → body(var 0)
-   However, now all “var 0” references in “body” refer to the wrong argument;
-   they now refer to “one more lambda away than before”. -}
-
-unknown-count : List (Arg Term) → ℕ
-unknown-count [] = 0
-unknown-count (arg i unknown ∷ xs) = 1 + unknown-count xs
-unknown-count (arg i _ ∷ xs) = unknown-count xs
-
-unknown-λ : ℕ → Term → Term
-unknown-λ zero body = body
-unknown-λ (suc n) body = unknown-λ n (λv "section" ↦ body)
-
-{- Replace ‘unknown’ with sections -}
-patch : Term → Term
-patch it@(def f args) = unknown-λ (unknown-count args) (def f (unknown-elim 0 args))
-patch it@(var f args) = unknown-λ (unknown-count args) (var f (unknown-elim 0 args))
-patch it@(con f args) = unknown-λ (unknown-count args) (con f (unknown-elim 0 args))
-patch t = t
+-- {- If we have “f $ args” return “f”. -}
+-- $-head : Term → Term
+-- $-head (var v args) = var v []
+-- $-head (con c args) = con c []
+-- $-head (def f args) = def f []
+-- $-head (pat-lam cs args) = pat-lam cs []
+-- $-head t = t
 
 
-macro
-  spine : Term → Term → TC ⊤
-  spine p goal =
-    do τ ← inferType p
-       _ , _ , l , r ← ≡-type-info τ
-       unify goal (patch (l ⊓ r))
 
-macro
-  applyEq : Term → Term → TC ⊤
-  applyEq p hole =
-    do
-       τ ← inferType hole
-       _ , _ , l , r ← ≡-type-info τ
-       unify hole ((def (quote cong) (vArg (patch (l ⊓ r)) ∷ vArg p ∷ [])))
+-- import Agda.Builtin.Reflection as Builtin
 
+-- _$-≟_ : Term → Term → Bool
+-- con c args $-≟ con c′ args′ = Builtin.primQNameEquality c c′
+-- def f args $-≟ def f′ args′ = Builtin.primQNameEquality f f′
+-- var x args $-≟ var x′ args′ = does (x Nat.≟ x′)
+-- _ $-≟ _ = false
+
+-- {- Only gets heads and as much common args, not anywhere deep. :'( -}
+-- infix 5 _⊓_
+-- {-# TERMINATING #-} {- Fix this by adding fuel (con c args) ≔ 1 + length args -}
+-- _⊓_ : Term → Term → Term
+-- l ⊓ r with l $-≟ r | l | r
+-- ...| false | x | y = unknown
+-- ...| true | var f args | var f′ args′ = var f (List.zipWith (λ{ (arg i!! t) (arg j!! s) → arg i!! (t ⊓ s) }) args args′)
+-- ...| true | con f args | con f′ args′ = con f (List.zipWith (λ{ (arg i!! t) (arg j!! s) → arg i!! (t ⊓ s) }) args args′)
+-- ...| true | def f args | def f′ args′ = def f (List.zipWith (λ{ (arg i!! t) (arg j!! s) → arg i!! (t ⊓ s) }) args args′)
+-- ...| true | ll | _ = ll {- Left biased; using ‘unknown’ does not ensure idempotence. -}
+
+-- {- ‘unknown’ goes to a variable, a De Bruijn index -}
+-- unknown-elim : ℕ → List (Arg Term) → List (Arg Term)
+-- unknown-elim n [] = []
+-- unknown-elim n (arg i unknown ∷ xs) = arg i (var n []) ∷ unknown-elim (n + 1) xs
+-- unknown-elim n (arg i (var x args) ∷ xs) = arg i (var (n + suc x) args) ∷ unknown-elim n xs
+-- unknown-elim n (arg i x ∷ xs)       = arg i x ∷ unknown-elim n xs
+-- {- Essentially we want: body(unknownᵢ)  ⇒  λ _ → body(var 0)
+--    However, now all “var 0” references in “body” refer to the wrong argument;
+--    they now refer to “one more lambda away than before”. -}
+
+-- unknown-count : List (Arg Term) → ℕ
+-- unknown-count [] = 0
+-- unknown-count (arg i unknown ∷ xs) = 1 + unknown-count xs
+-- unknown-count (arg i _ ∷ xs) = unknown-count xs
+
+-- unknown-λ : ℕ → Term → Term
+-- unknown-λ zero body = body
+-- unknown-λ (suc n) body = unknown-λ n (λv "section" ↦ body)
+
+-- {- Replace ‘unknown’ with sections -}
+-- patch : Term → Term
+-- patch it@(def f args) = unknown-λ (unknown-count args) (def f (unknown-elim 0 args))
+-- patch it@(var f args) = unknown-λ (unknown-count args) (var f (unknown-elim 0 args))
+-- patch it@(con f args) = unknown-λ (unknown-count args) (con f (unknown-elim 0 args))
+-- patch t = t
+
+
+-- macro
+--   spine : Term → Term → Leftovers ⊤
+--   spine p goal =
+--     do τ ← inferType p
+--        _ , _ , l , r ← ≡-type-info τ
+--        unify goal (patch (l ⊓ r))
+
+-- macro
+--   applyEq : Term → Term → Leftovers ⊤
+--   applyEq p hole =
+--     do
+--        τ ← inferType hole
+--        _ , _ , l , r ← ≡-type-info τ
+--        unify hole ((def (quote cong) (vArg (patch (l ⊓ r)) ∷ vArg p ∷ [])))
