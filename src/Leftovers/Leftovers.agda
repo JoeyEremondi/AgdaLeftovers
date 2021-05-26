@@ -92,21 +92,29 @@ findLeftovers theMacro goal =
 
     -- Run the given macro in the extended context
     funBody <- extendContext (vArg productType) do
-      -- goalType ← case goalAbs of λ
-      --   { (abs _ goalType) → return goalType }
-      body <- newMeta unknown -- goalType
+      goalType ← case goalAbs of λ
+        { (abs _ goalType) → return goalType }
+      body <- newMeta goalType
       theMacro body
 
       --Now we see what holes are left
       normBody <- normalise body
-      debugPrint "Hello" 2 (strErr "MacroBody" ∷ termErr normBody ∷ [])
+      debugPrint "Hello" 2 (strErr "MacroBody " ∷ termErr body ∷ [])
+      debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normBody ∷ [])
       let
         handleMetas : _ → Meta → Data.Maybe.Maybe MetaInContext
         handleMetas ctx m = just (record
           {context = ctx
           ; unapplied = meta m (vArg (var 0 []) ∷ [])
           ; applied = meta m (vArg (var 0 []) ∷ (List.map proj₂ ctx))}) -- just (record {context = ctx (meta m (vArg (var 0 []) ∷ [])) ?})
-        metas = collectFromSubterms  (record { onVar = λ _ _ → nothing ; onMeta = handleMetas ; onCon = λ _ _ → nothing ; onDef = λ _ _ → nothing }) normBody
+        metas =
+          collectFromSubterms
+            (record
+              { onVar = λ _ _ → nothing
+              ; onMeta = handleMetas
+              ; onCon = λ _ _ → nothing
+              ; onDef = λ _ _ → nothing })
+            normBody
         indexedMetas = (Vec.zip (Vec.allFin _) (Vec.fromList metas))
 
       -- Now we know how many elements are in our Product
