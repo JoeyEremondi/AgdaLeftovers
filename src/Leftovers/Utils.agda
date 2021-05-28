@@ -13,6 +13,8 @@ open import Data.Nat
 
 open import Data.Unit
 
+open import Function using (_$_)
+
 case_of_ : ∀ {A B : Set} → A → (A → B) → B
 case x of f = f x
 
@@ -20,6 +22,14 @@ case x of f = f x
 λv x ↦ body  = lam visible (abs x body)
 λh x ↦ body  = lam hidden (abs x body)
 
+app : Term → Term → Term
+app f x = def (quote _$_) (vArg f ∷ vArg x ∷ [])
+
+returnTypeFor : Type → Term → Leftovers Type
+returnTypeFor (pi (arg _ dom) cod) x = do
+  checkType x dom
+  pure (app (lam visible cod) x)
+returnTypeFor t _ = typeError (strErr "Can't get return type of non-pi type " ∷ termErr t ∷ [])
 
 --Try an action (usually unification) but continue without it
 -- if it fails
