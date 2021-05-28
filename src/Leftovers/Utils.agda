@@ -10,7 +10,7 @@ open import Reflection.Term
 open import Reflection.Pattern as P
 open import Reflection.TypeChecking.Monad.Instances
 open import Data.Nat
-
+open import Data.Product
 open import Data.Unit
 
 open import Function using (_$_)
@@ -54,16 +54,16 @@ import Reflection.Show
 -- Given a name, get its type
 -- and generate fresh metas for each argument
 -- e.g. turn (a -> b -> c -> d) into [_ , _ , _]
-fully-applied-pattern : Name → Leftovers (List (Arg Pattern))
+fully-applied-pattern : Name → Leftovers (List ((Arg Pattern) × (Arg Term)))
 fully-applied-pattern nm =
   do
     nmType ← getType nm
     -- debugPrint "full-app" 2 (strErr "fullApp " ∷ nameErr nm ∷ termErr nmType ∷ [])
     full-app-type nmType 0
   where
-    full-app-type : Type → ℕ → Leftovers (List (Arg Pattern))
+    full-app-type : Type → ℕ → Leftovers (List ((Arg Pattern) × (Arg Term)))
     full-app-type (pi (arg info dom) (abs s x)) pos = do
       rec ← full-app-type x (1 + pos)
       hole ← freshMeta dom
-      pure (arg info (P.var pos) ∷ rec)
+      pure ((arg info (P.var pos) , arg info (var pos [])) ∷ rec)
     full-app-type t pos = pure []

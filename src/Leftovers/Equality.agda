@@ -41,8 +41,8 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
     = do
       -- let η = nom
       δ ← getDefinition typeName
-      clauses ← forM (constructors δ) mk-cls
       holeType ← inferType hole
+      clauses ← forM (constructors δ) (mk-cls holeType)
       -- declareDef (vArg η) holeType
       let retFun = pat-lam clauses []
       normFun ← reduce retFun
@@ -53,10 +53,14 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
     where
       -- For each constructor, generate the clause,
       -- along with the metavariable term for its right-hand side
-      mk-cls : Name → Leftovers (Clause )
-      mk-cls ctor =
+      mk-cls : Type → Name → Leftovers (Clause )
+      mk-cls holeType ctor =
          do
-           patArgs <- fully-applied-pattern ctor
+           fullyApplied <- fully-applied-pattern ctor
+           let
+             patArgs = List.map proj₁ fullyApplied
+             patTerm = List.map proj₂ fullyApplied
+           retType ← returnTypeFor holeType (con ctor patTerm)
            rhs <- freshMeta unknown
            let teles = (List.map (λ _ → ( "_" , vArg unknown )) patArgs)
            debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
