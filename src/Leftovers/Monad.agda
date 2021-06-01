@@ -57,6 +57,38 @@ record Hole : Set  where
     hole : Term
     context : List (Arg Type)
 
+
+import Relation.Binary.PropositionalEquality as Eq
+import Relation.Binary.Definitions as D
+open import Data.Empty using (⊥)
+EquivHole : ∀ (x y : Hole) → Set
+EquivHole (mkHole (meta x _) _ ) (mkHole (meta y _) _) = x Eq.≡ y
+EquivHole (mkHole x _) (mkHole y _) = ⊥
+
+open import Relation.Nullary using (yes ; no)
+
+equivDec : D.Decidable EquivHole
+equivDec (mkHole (meta x _) _) (mkHole (meta y _) _) = x Meta.≟ y
+  where import Reflection.Meta as Meta
+equivDec (mkHole (var x args) _) (mkHole y _) =  no (λ z → z)
+equivDec (mkHole (con c args) _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole (def f args) _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole (lam v t) _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole (pat-lam cs args) _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole (pi a b) _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole (Term.sort s) _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole (lit l) _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole unknown _) (mkHole y _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (var x₂ args) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (con c args) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (def f args) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (lam v t) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (pat-lam cs args) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (pi a b) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (Term.sort s) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole (lit l) _) = no (λ z → z)
+equivDec (mkHole (meta x x₁) _) (mkHole unknown _) = no (λ z → z)
+
 open import Category.Monad.State
 open import Category.Monad.Indexed using (RawIMonad ; RawIMonadPlus)
 open import Category.Applicative.Indexed using (RawIApplicative ; RawIAlternative)

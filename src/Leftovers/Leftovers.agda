@@ -64,44 +64,14 @@ _∥_ {n = suc n} {sets = sets} {X = X} holes x = makeHoles (x , getHoles holes)
 -- quoteSets {n = suc n} (x Vec.∷ v) = app (app (quoteTerm (_,_   {A = Set} {B = λ x₁ → Sets n (proj₂ nSet)}  )) x) (quoteSets v)
 
 
-record MetaInContext : Set where
-  constructor Cmeta
-  field
-    context : LCxt
-    unapplied : Term
-    applied : Term
+-- record MetaInContext : Set where
+--   constructor Cmeta
+--   field
+--     context : LCxt
+--     unapplied : Term
+--     applied : Term
 
-open import Data.Empty
-import Relation.Binary.PropositionalEquality as Eq
-import Relation.Binary.Definitions as D
 
-EquivMeta : ∀ (x y : MetaInContext) → Set
-EquivMeta (Cmeta _ (meta x _) _) (Cmeta _ (meta y _) _) = x Eq.≡ y
-EquivMeta (Cmeta _ x _) (Cmeta _ y _) = ⊥
-
-open import Relation.Nullary using (yes ; no)
-
-equivDec : D.Decidable EquivMeta
-equivDec (Cmeta _ (meta x _) _) (Cmeta _ (meta y _) _) = x Meta.≟ y
-  where import Reflection.Meta as Meta
-equivDec (Cmeta _ (var x args) _) (Cmeta _ y _) =  no (λ z → z)
-equivDec (Cmeta _ (con c args) _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ (def f args) _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ (lam v t) _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ (pat-lam cs args) _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ (pi a b) _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ (sort s) _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ (lit l) _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ unknown _) (Cmeta _ y _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (var x₂ args) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (con c args) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (def f args) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (lam v t) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (pat-lam cs args) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (pi a b) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (sort s) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (lit l) _) = no (λ z → z)
-equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ unknown _) = no (λ z → z)
 
 import Leftovers.Monad as L
 
@@ -142,11 +112,8 @@ findLeftovers theMacro goal =
       -- debugPrint "Hello" 2 (strErr "MacroBody " ∷ termErr body ∷ [])
       -- debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normBody ∷ [])
       let
-        handleMetas : _ → Meta → Data.Maybe.Maybe MetaInContext
-        handleMetas ctx m = just (record
-          {context = ctx
-          ; unapplied = meta m (vArg (var 0 []) ∷ [])
-          ; applied = meta m (vArg (var 0 []) ∷ (List.map proj₂ ctx))}) -- just (record {context = ctx (meta m (vArg (var 0 []) ∷ [])) ?})
+        handleMetas : _ → Meta → Data.Maybe.Maybe L.Hole
+        handleMetas ctx m = just (L.mkHole (meta m (vArg (var 0 []) ∷ List.map proj₂ ctx)) (List.map proj₂ ctx))
           --
       debugPrint "L" 2 (strErr "ALLMETAS " ∷ List.map (λ x → termErr (L.Hole.hole x)) allMetas)
       normMetas ← forM allMetas (λ hole → normalise (L.Hole.hole hole))
@@ -155,7 +122,8 @@ findLeftovers theMacro goal =
           forM allMetas λ hole → do
             nf ← inContext (L.Hole.context hole) (normalise (L.Hole.hole hole))
             case nf of λ
-              {(meta x args) → return [ Cmeta (List.map (λ x → "arg" , x) (L.Hole.context hole)) (meta x []) (meta x args)   ]
+              {(meta x args)
+                → return [ hole ]
               ;_ → do
                 let
                   metas =
@@ -165,19 +133,21 @@ findLeftovers theMacro goal =
                         ; onMeta = handleMetas
                         ; onCon = λ _ _ → nothing
                         ; onDef = λ _ _ → nothing }) nf
-                return (List.map (λ (Cmeta ctx a b) → Cmeta (ctx List.++ List.map (λ x → "arg" , x) (L.Hole.context hole)) a b) metas)
+                return metas
+                -- (List.map (λ (L.mkHole b ctx) →
+                --   L.mkHole b (ctx List.++ List.map (λ x → "arg" , x) (L.Hole.context hole))) metas)
               }
       let
-        metas = List.deduplicate equivDec (List.concat metaList)
+        metas = List.deduplicate L.equivDec (List.concat metaList)
         indexedMetas = (Vec.zip (Vec.allFin _) (Vec.fromList metas))
-      debugPrint "Leftovers" 2 (strErr "All holes " ∷ List.map (λ m → termErr (MetaInContext.applied m)) metas)
+      debugPrint "Leftovers" 2 (strErr "All holes " ∷ List.map (λ m → termErr (L.Hole.hole m)) metas)
       -- Now we know how many elements are in our Product
       unify (lit (nat (List.length metas))) numHoles
 
       -- Function to get the ith metavariable from the argument
       -- accessor i as = projₙ (List.length metas) {ls = nSet} {as = as} i
       holeTypes <- VCat.TraversableM.forM {a = Level.zero} {n = List.length metas} tcMonad indexedMetas
-        λ {(i , Cmeta ctx  m mapp) → inferType mapp}
+        λ {(i , L.mkHole m ctx) → inferType m}
       debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
       let setsFromTypes = quoteSets holeTypes
       debugPrint "Hello" 2 (strErr "Made sets" ∷ termErr setsFromTypes ∷ [])
@@ -187,7 +157,7 @@ findLeftovers theMacro goal =
       unify sets setsFromTypes
       unify levels levelsFromTypes
     -- Replace the ith meta with the ith element of the HList
-      forM (Vec.toList indexedMetas) λ ( i , (Cmeta ctx mt mtApp) ) → do
+      forM (Vec.toList indexedMetas) λ ( i , (L.mkHole m ctx) ) → do
       -- let lhs = (meta mt (List.map proj₂ ctx))
         let
           rhs =
@@ -200,7 +170,7 @@ findLeftovers theMacro goal =
               ∷ vArg (var 0 [])
               ∷ []))
         debugPrint "Hello" 2 (strErr "Unify RHS" ∷ termErr rhs ∷ [] )
-        unify mtApp rhs
+        unify m rhs
       return body
     --Produce the function that gives the result of the last macro
     unify goal (lam visible (abs "holes" funBody))
