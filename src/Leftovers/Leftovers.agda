@@ -71,6 +71,38 @@ record MetaInContext : Set where
     unapplied : Term
     applied : Term
 
+open import Data.Empty
+import Relation.Binary.PropositionalEquality as Eq
+import Relation.Binary.Definitions as D
+
+EquivMeta : ∀ (x y : MetaInContext) → Set
+EquivMeta (Cmeta _ (meta x _) _) (Cmeta _ (meta y _) _) = x Eq.≡ y
+EquivMeta (Cmeta _ x _) (Cmeta _ y _) = ⊥
+
+open import Relation.Nullary using (yes ; no)
+
+equivDec : D.Decidable EquivMeta
+equivDec (Cmeta _ (meta x _) _) (Cmeta _ (meta y _) _) = x Meta.≟ y
+  where import Reflection.Meta as Meta
+equivDec (Cmeta _ (var x args) _) (Cmeta _ y _) =  no (λ z → z)
+equivDec (Cmeta _ (con c args) _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ (def f args) _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ (lam v t) _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ (pat-lam cs args) _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ (pi a b) _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ (sort s) _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ (lit l) _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ unknown _) (Cmeta _ y _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (var x₂ args) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (con c args) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (def f args) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (lam v t) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (pat-lam cs args) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (pi a b) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (sort s) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ (lit l) _) = no (λ z → z)
+equivDec (Cmeta _ (meta x x₁) _) (Cmeta _ unknown _) = no (λ z → z)
+
 import Leftovers.Monad as L
 
 findLeftovers : (Term → L.Leftovers ⊤) → Term → TC ⊤
@@ -78,6 +110,7 @@ findLeftovers theMacro goal =
   do
     -- We're producing a function from hole-fills to the goal type
     funType ← inferType goal
+    debugPrint "Leftovers" 2 (strErr "Goal function type " ∷ termErr funType ∷ [])
     -- Unification variable for number of holes, we don't know how many yet
     numHoles ← newMeta (quoteTerm ℕ)
     -- Unification variables for the HVec of holes
@@ -96,6 +129,8 @@ findLeftovers theMacro goal =
     funBody <- extendContext (vArg productType) do
       goalType ← case goalAbs of λ
         { (abs _ goalType) → return goalType }
+    -- hole ← newMeta goalType
+      debugPrint "Leftovers" 2 (strErr "goalType before run theMacro" ∷ termErr goalType ∷ [])
       (body , allMetas) ← L.runLeftovers
         ((L.freshMeta goalType) L.>>=
         λ hole → theMacro hole L.>> L.pure hole)
@@ -113,6 +148,9 @@ findLeftovers theMacro goal =
           ; unapplied = meta m (vArg (var 0 []) ∷ [])
           ; applied = meta m (vArg (var 0 []) ∷ (List.map proj₂ ctx))}) -- just (record {context = ctx (meta m (vArg (var 0 []) ∷ [])) ?})
           --
+      debugPrint "L" 2 (strErr "ALLMETAS " ∷ List.map (λ x → termErr (L.Hole.hole x)) allMetas)
+      normMetas ← forM allMetas (λ hole → normalise (L.Hole.hole hole))
+      debugPrint "L" 2 (strErr "ALLMETAS NORM " ∷ List.map termErr normMetas)
       metaList ←
           forM allMetas λ hole → do
             nf ← inContext (L.Hole.context hole) (normalise (L.Hole.hole hole))
@@ -130,9 +168,9 @@ findLeftovers theMacro goal =
                 return (List.map (λ (Cmeta ctx a b) → Cmeta (ctx List.++ List.map (λ x → "arg" , x) (L.Hole.context hole)) a b) metas)
               }
       let
-        metas = List.concat metaList
+        metas = List.deduplicate equivDec (List.concat metaList)
         indexedMetas = (Vec.zip (Vec.allFin _) (Vec.fromList metas))
-
+      debugPrint "Leftovers" 2 (strErr "All holes " ∷ List.map (λ m → termErr (MetaInContext.applied m)) metas)
       -- Now we know how many elements are in our Product
       unify (lit (nat (List.length metas))) numHoles
 
@@ -192,7 +230,7 @@ findLeftovers theMacro goal =
 
 -- infixr 10 [_⇒_]
 
-by : ∀ {ℓ} {n} {ls} {types : Sets n ls} {A : Set ℓ}
+by : ∀ {ℓ} {A : Set ℓ} {n} {ls} {types : Sets n ls}
   → (theMacro : Term → L.Leftovers ⊤)
   → {@(tactic findLeftovers theMacro) f : Holes n ls types → A}
   → Product n types → A

@@ -61,7 +61,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
              patArgs = List.map proj₁ fullyApplied
              patTerm = List.map proj₂ fullyApplied
            retType ← returnTypeFor holeType (con ctor patTerm)
-           rhs <- freshMeta unknown
+           rhs <- freshMeta retType
            let teles = (List.map (λ _ → ( "_" , vArg unknown )) patArgs)
            debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
            let

@@ -152,6 +152,7 @@ logHole hole = do
 freshMeta : Type → Leftovers Term
 freshMeta t = do
   theMeta ← liftTC (TC.newMeta t)
+  liftTC (TC.debugPrint "freshMeta" 2 (strErr "Fresh meta " ∷ termErr theMeta ∷ strErr " with type " ∷ termErr t ∷ []))
   ctx ← liftTC TC.getContext
   logHole (mkHole theMeta ctx)
   pure theMeta

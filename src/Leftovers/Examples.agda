@@ -12,7 +12,7 @@ open import Data.Nat
 open import Data.Product
 
 notNot : ∀ b → not (not b) ≡ b
-notNot = by (cases (quote Bool)) ({!refl!} , {!!})
+notNot = by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) {!!} -- ({!refl!} , {!!})
 
 -- plusZeroR : ∀ n → n + 0 ≡ n
 -- plusZeroR = by (refl-cases (quote ℕ)) ?
