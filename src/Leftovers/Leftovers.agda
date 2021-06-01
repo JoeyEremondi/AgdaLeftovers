@@ -177,7 +177,7 @@ findLeftovers theMacro goal =
       -- Function to get the ith metavariable from the argument
       -- accessor i as = projₙ (List.length metas) {ls = nSet} {as = as} i
       holeTypes <- VCat.TraversableM.forM {a = Level.zero} {n = List.length metas} tcMonad indexedMetas
-        λ {(i , Cmeta ctx  m mapp) → inferType m}
+        λ {(i , Cmeta ctx  m mapp) → inferType mapp}
       debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
       let setsFromTypes = quoteSets holeTypes
       debugPrint "Hello" 2 (strErr "Made sets" ∷ termErr setsFromTypes ∷ [])
@@ -200,7 +200,7 @@ findLeftovers theMacro goal =
               ∷ vArg (var 0 [])
               ∷ []))
         debugPrint "Hello" 2 (strErr "Unify RHS" ∷ termErr rhs ∷ [] )
-        unify mt rhs
+        unify mtApp rhs
       return body
     --Produce the function that gives the result of the last macro
     unify goal (lam visible (abs "holes" funBody))
