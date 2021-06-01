@@ -33,6 +33,9 @@ open Data.List.Categorical.TraversableM {m = Level.zero} leftoversMonad
 
 
 open import Reflection.Show
+import Data.Nat.Show as NShow
+
+
 
 --Unify the goal with a function that does a case-split on an argument of the type with the given name
 -- Return the metavariables, along with telescopes, for each branch
@@ -42,6 +45,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       -- let η = nom
       δ ← getDefinition typeName
       holeType ← inferType hole
+      debugPrint "refl-cases" 2 (strErr " hole type to start " ∷ termErr holeType ∷ [])
       clauses ← forM (constructors δ) (mk-cls holeType)
       -- declareDef (vArg η) holeType
       let retFun = pat-lam clauses []
@@ -56,13 +60,24 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       mk-cls : Type → Name → Leftovers (Clause )
       mk-cls holeType ctor =
          do
+           debugPrint "mk-cls" 2 (strErr "mk-cls with ctor " ∷ nameErr ctor ∷ [])
            fullyApplied <- fully-applied-pattern ctor
            let
-             patArgs = List.map proj₁ fullyApplied
-             patTerm = List.map proj₂ fullyApplied
-           retType ← returnTypeFor holeType (con ctor patTerm)
-           rhs <- freshMeta retType
-           let teles = (List.map (λ _ → ( "_" , vArg unknown )) patArgs)
+             patArgs = List.map CtorArg.pat fullyApplied
+             patTerm = List.map CtorArg.term fullyApplied
+             patTypes = List.map CtorArg.type fullyApplied
+           rhs <- extendContexts patTypes do
+               debugPrint "" 2 (strErr "before retType " ∷ termErr holeType ∷ strErr "   and   " ∷ termErr (con ctor patTerm) ∷  [])
+               retType ← returnTypeFor holeType (con ctor patTerm)
+               debugPrint "mk-cls" 2 (strErr "retType is  " ∷ termErr retType ∷ [])
+               -- Make the right-hand side in an extended context
+               -- with new pattern-match variables
+               freshMeta retType
+           let
+             teles =
+               List.map
+                 (λ (x , n) → ( "arg" String.++ NShow.show n , x ))
+                 (List.zip patTypes (List.upTo (List.length patTypes)))
            debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
            let
              ret =

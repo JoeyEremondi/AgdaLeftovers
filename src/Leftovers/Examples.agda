@@ -11,8 +11,11 @@ open import Relation.Binary.PropositionalEquality
 open import Data.Nat
 open import Data.Product
 
-notNot : ∀ b → not (not b) ≡ b
-notNot = by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) {!!} -- ({!refl!} , {!!})
+-- notNot : ∀ b → not (not b) ≡ b
+-- notNot = by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) {!!} -- ({!refl!} , {!!})
+
+plusZero : ∀ n → n ≡ n + 0
+plusZero = by {A = ∀ n → n ≡ n + 0} (cases (quote ℕ)) ?
 
 -- plusZeroR : ∀ n → n + 0 ≡ n
 -- plusZeroR = by (refl-cases (quote ℕ)) ?

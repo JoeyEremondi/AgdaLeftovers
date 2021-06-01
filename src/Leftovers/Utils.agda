@@ -8,12 +8,16 @@ open import Data.List as List
 open import Leftovers.Monad
 open import Reflection.Term
 open import Reflection.Pattern as P
-open import Reflection.TypeChecking.Monad.Instances
+-- open import Reflection.TypeChecking.Monad.Instances
 open import Data.Nat
 open import Data.Product
 open import Data.Unit
 
 open import Function using (_$_)
+
+import Data.List.Categorical
+open import Level
+open Data.List.Categorical.TraversableM {m = Level.zero} leftoversMonad
 
 case_of_ : ∀ {A B : Set} → A → (A → B) → B
 case x of f = f x
@@ -27,6 +31,7 @@ app f x = def (quote _$_) (vArg f ∷ vArg x ∷ [])
 
 returnTypeFor : Type → Term → Leftovers Type
 returnTypeFor (pi (arg _ dom) cod) x = do
+  debugPrint "returnTypeFor" 2 (strErr "Checking pattern " ∷ termErr x ∷ strErr "  against type  " ∷ termErr dom ∷ [])
   checkType x dom
   pure (app (lam visible cod) x)
 returnTypeFor t _ = typeError (strErr "Can't get return type of non-pi type " ∷ termErr t ∷ [])
@@ -51,19 +56,28 @@ constructors _ = []
 
 import Reflection.Show
 
+record CtorArg : Set where
+  constructor mkCtorArg
+  field
+    pat : Arg Pattern
+    term : Arg Term
+    type : Arg Type
+
 -- Given a name, get its type
 -- and generate fresh metas for each argument
 -- e.g. turn (a -> b -> c -> d) into [_ , _ , _]
-fully-applied-pattern : Name → Leftovers (List ((Arg Pattern) × (Arg Term)))
+fully-applied-pattern : Name → Leftovers (List (CtorArg))
 fully-applied-pattern nm =
   do
     nmType ← getType nm
     -- debugPrint "full-app" 2 (strErr "fullApp " ∷ nameErr nm ∷ termErr nmType ∷ [])
-    full-app-type nmType 0
+    pure (full-app-type nmType 0)
   where
-    full-app-type : Type → ℕ → Leftovers (List ((Arg Pattern) × (Arg Term)))
-    full-app-type (pi (arg info dom) (abs s x)) pos = do
-      rec ← full-app-type x (1 + pos)
-      hole ← freshMeta dom
-      pure ((arg info (P.var pos) , arg info (var pos [])) ∷ rec)
-    full-app-type t pos = pure []
+    full-app-type : Type → ℕ → List (CtorArg)
+    full-app-type (pi (arg info dom) (abs s x)) pos =
+      (mkCtorArg
+        (arg info (P.var pos))
+        (arg info (var pos []))
+        (arg info unknown)) ∷ full-app-type x (1 + pos)
+      -- ((arg info (P.var pos) , arg info (var pos [])) ∷ full-app-type x (1 + pos))
+    full-app-type t pos = []
