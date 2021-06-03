@@ -46,9 +46,11 @@ data Holes (n : ℕ) (levels : Levels n) (sets : Sets n levels ) : Set (⨆ n le
 
 getHoles : ∀ {n ls sets} → Holes n ls sets → Product n sets
 getHoles (makeHoles p) = p
+{-# INLINE getHoles #-}
 
 nthHole : ∀ n {ls} {as : Sets n ls } k → Holes n ls as → Projₙ as k
 nthHole n k h = projₙ n k (getHoles h)
+{-# INLINE nthHole #-}
 
 infixr 10 _∥_
 
@@ -95,7 +97,27 @@ inferHoleType hole = do
       rec ← addArrows extras holeType
       return (pi x (abs "ctx" rec))
 
+data Dummy : Set where
+  dummy : Dummy
 
+
+
+sep : Term → TC Term
+sep t = do
+  ty ← inferType t
+  let ret = (def (quote  identity) [ vArg t ]) ⦂ ty
+  return ret
+
+open import Reflection.DeBruijn using (weaken)
+
+-- Hack using case-lambda to convince Agda that a term is a definition
+-- Helps with the termination checker
+-- makeDef : Term → TC Term
+-- makeDef t = do
+
+--   ty ← inferType t
+--   let ret = pat-lam [ clause [] [ vArg (con (quote dummy) []) ] t ] []
+--   return (app (def (quote the) (vArg (pi (vArg (quoteTerm Dummy)) (abs "_" (weaken 1 ty))) ∷ vArg ret ∷ [])) (quoteTerm dummy))
 
 findLeftovers : (Term → L.Leftovers ⊤) → Term → TC ⊤
 findLeftovers theMacro goal =
@@ -106,8 +128,10 @@ findLeftovers theMacro goal =
     -- Unification variable for number of holes, we don't know how many yet
     numHoles ← newMeta (quoteTerm ℕ)
     -- Unification variables for the HVec of holes
-    levels ← newMeta (def (quote Levels) (vArg numHoles ∷ [])) -- def (quote nSet) [ hArg numHoles ]
-    sets ← newMeta (def (quote Sets) (vArg numHoles ∷ vArg levels ∷ []))
+    let levelsType = (def (quote Levels) (vArg numHoles ∷ []))
+    levels ← newMeta levelsType -- def (quote nSet) [ hArg numHoles ]
+    let setsType = (def (quote Sets) (vArg numHoles ∷ vArg levels ∷ []))
+    sets ← newMeta setsType
     let productType = def (quote Holes) (vArg numHoles ∷ vArg levels ∷ vArg sets ∷ [])
     -- The return type of the function we're producing
     (argType , goalAbs) ← case funType of λ
@@ -186,6 +210,7 @@ findLeftovers theMacro goal =
     -- Replace the ith meta with the ith element of the HList
       forM (Vec.toList indexedMetas) λ ( i , hole ) → inContext (L.Hole.context hole) do
       -- let lhs = (meta mt (List.map proj₂ ctx))
+        holeType ← inferType (L.Hole.hole hole)
         let
           holeCtx = L.Hole.context hole
           numArgs = length holeCtx - 1
@@ -193,20 +218,22 @@ findLeftovers theMacro goal =
             (def (quote nthHole)
               (vArg (lit (nat (List.length metas)))
               -- ∷ hArg (quoteTerm nSet)
-              ∷ hArg levels
-              ∷ hArg sets
+              ∷ hArg (levels ⦂ levelsType)
+              ∷ hArg (sets ⦂ setsType)
               ∷ vArg (Data.Fin.Reflection.toTerm i)
               --TODO hidden args for context vars?
-              ∷ vArg (var numArgs [])
+              ∷ vArg (var numArgs [] ⦂ productType)
               ∷ (List.map (λ n → vArg (var n [])) (List.upTo numArgs))))
+        -- rhs ← makeDef rawRhs
         debugPrint "Hello" 2 (strErr "Unify LHS " ∷ strErr (showTerm (L.Hole.hole hole)) ∷ [] )
         debugPrint "Hello" 2 (strErr "Unify RHS " ∷ strErr (showTerm rhs) ∷ [] )
-        unify (L.Hole.hole hole) rhs
-      return body
+        unify (L.Hole.hole hole) (rhs ⦂ holeType)
+      --Hack to help with termination
+      sep (body ⦂ goalType)
     --Produce the function that gives the result of the last macro
-    unify goal (lam visible (abs "holes" funBody))
-    -- finalResult ← reduce goal
-    -- debugPrint "Hello" 2 (strErr "Final Result" ∷ termErr finalResult ∷ [])
+    unify goal ((lam visible (abs "holes" funBody)) ⦂ funType )
+    finalResult ← reduce goal
+    debugPrint "Hello" 2 (strErr "Final Result" ∷ termErr finalResult ∷ [])
     -- return tt
 
 
@@ -237,6 +264,46 @@ by : ∀ {ℓ} {A : Set ℓ} {n} {ls} {types : Sets n ls}
   → Product n types → A
 by {n = n} _ {f} x = f (makeHoles x)
 
+
+
+by' : ∀ {ℓ} {A : Set ℓ} {n} {ls} {types : Sets n ls}
+  → (theMacro : Term → L.Leftovers ⊤)
+  → {@(tactic findLeftovers theMacro) f : Holes n ls types → A}
+  → ⊤ → Product n types → A
+by' {n = n} _ {f} _ x = f (makeHoles x)
+
 -- by {n = n} _ {f} = curryₙ n (λ x → f (makeHoles x))
 
+
+
 -- syntax withLeftovers tac x = ► tac ⇒ x ◄
+macro
+  getNormal : ∀ {X : Set} → X → Term → TC ⊤
+  getNormal {X = X} x goal = do
+    t ← quoteTC x
+    ttype ← quoteTC X
+    checkType goal ttype
+    debugPrint "" 2 (strErr "get Normal term " ∷ termErr t ∷ [])
+    debugPrint "" 2 (strErr "get Normal term type " ∷ termErr ttype ∷ [])
+    goalType ← inferType goal
+    debugPrint "" 2 (strErr "get Normal goal type " ∷ termErr goalType ∷ [])
+    unify goalType ttype
+    nf ← normalise t
+    debugPrint "" 2 (strErr "get Normal term nf " ∷ termErr nf ∷ [])
+    unify goal nf
+
+
+  -- applyNormal : ∀ {ℓ1 ℓ2} {X : Set ℓ1} {Y : Set ℓ2} → (X → Y) → X → Term → TC ⊤
+  -- applyNormal {X = X} {Y} f x goal = do
+  --   goalType ← inferType goal
+  --   tX ← quoteTC X
+  --   tY ← quoteTC Y
+  --   tf ← quoteTC f
+  --   tx ← quoteTC x
+  --   nf ← normalise (app tf tx)
+  --   unify goalType tY
+  --   unify nf goal
+
+default : {A : Set} → A → Term → TC ⊤
+default x hole = bindTC (quoteTC x) (unify hole)
+

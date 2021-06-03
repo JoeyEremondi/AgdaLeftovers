@@ -298,21 +298,3 @@ runLeftovers comp  = TC.bindTC (comp (lift []))
   ((λ { (a , lift holes) → TC.return (a , holes) }) )
 
 
---Given a hole, infer its function type,
---taking anything in the hole's context that's not in the current context
--- as an argument
-inferHoleType : Hole → Leftovers Type
-inferHoleType hole = do
-  currentContext ← getContext
-  let
-    numExtras = (Data.List.length (Hole.context hole)) - (Data.List.length currentContext)
-    extras = Data.List.take numExtras (Hole.context hole)
-  holeType ← inContext (Hole.context hole) (inferType (Hole.hole hole))
-  addArrows extras holeType
-  where
-    open import Agda.Builtin.Nat
-    addArrows : List (Arg Type) → Term → Leftovers Type
-    addArrows [] holeType = pure holeType
-    addArrows (x ∷ extras) holeType = do
-      rec ← addArrows extras holeType
-      pure (pi x (abs "ctx" rec))

@@ -48,7 +48,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       debugPrint "refl-cases" 2 (strErr " hole type to start " ∷ termErr holeType ∷ [])
       clauses ← forM (constructors δ) (mk-cls holeType)
       -- declareDef (vArg η) holeType
-      let retFun = pat-lam clauses []
+      let retFun = (pat-lam clauses [])
       normFun ← reduce retFun
       debugPrint "refl-cases" 2 (strErr "reflcases ret non-norm " ∷ termErr retFun ∷ [])
       unify hole normFun
@@ -66,29 +66,29 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
              patArgs = List.map CtorArg.pat fullyApplied
              patTerm = List.map CtorArg.term fullyApplied
              patTypes = List.map CtorArg.type fullyApplied
-           rhs <- extendContexts patTypes do
+           extendContexts patTypes do
                debugPrint "" 2 (strErr "before retType " ∷ termErr holeType ∷ strErr "   and   " ∷ termErr (con ctor patTerm) ∷  [])
                retType ← returnTypeFor holeType (con ctor patTerm)
                debugPrint "mk-cls" 2 (strErr "retType is  " ∷ termErr retType ∷ [])
                -- Make the right-hand side in an extended context
                -- with new pattern-match variables
-               freshMeta retType
-           let
-             teles =
-               List.map
-                 (λ (x , n) → ( "arg" String.++ NShow.show n , x ))
-                 (List.zip patTypes (List.upTo (List.length patTypes)))
-           debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
-           let
-             ret =
-               (clause
-                 teles
-                 [ vArg (con ctor patArgs) ]
-                 rhs)
+               rhs ← freshMeta retType
+               let
+                 teles =
+                   List.map
+                     (λ (x , n) → ( "arg" String.++ NShow.show n , x ))
+                     (List.zip patTypes (List.upTo (List.length patTypes)))
+               debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
+               let
+                 ret =
+                   (clause
+                     teles
+                     [ vArg (con ctor patArgs) ]
+                     (rhs ⦂ retType))
 
-           debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
-           -- tryUnify rhs (con (quote refl) [])
-           pure ret
+               debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
+               -- tryUnify rhs (con (quote refl) [])
+               pure ret
 
 
 

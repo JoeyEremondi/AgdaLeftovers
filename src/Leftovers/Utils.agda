@@ -26,6 +26,17 @@ case x of f = f x
 λv x ↦ body  = lam visible (abs x body)
 λh x ↦ body  = lam hidden (abs x body)
 
+identity : ∀ {ℓ} {@0 X : Set ℓ} → X → X
+identity x = x
+
+
+the : ∀ {ℓ} → (@0 T : Set ℓ) → T → T
+the _ = identity
+
+_⦂_ : Term → Type → Term
+t ⦂ T = def (quote the) (vArg T ∷ vArg t ∷ [])
+
+
 app : Term → Term → Term
 app f x = def (quote _$_) (vArg f ∷ vArg x ∷ [])
 
@@ -34,7 +45,13 @@ returnTypeFor (pi (arg _ dom) cod) x = do
   debugPrint "returnTypeFor" 2 (strErr "Checking pattern " ∷ termErr x ∷ strErr "  against type  " ∷ termErr dom ∷ [])
   checkType x dom
   pure (app (lam visible cod) x)
-returnTypeFor t _ = typeError (strErr "Can't get return type of non-pi type " ∷ termErr t ∷ [])
+returnTypeFor t x = do
+  ldom ← freshMeta (quoteTerm Level)
+  lcod ← freshMeta (quoteTerm Level)
+  dom ← freshMeta (sort (set ldom))
+  cod ← extendContext (vArg dom) (freshMeta (sort (set lcod)))
+  unify t (pi (vArg dom) (abs "x" cod))
+  pure (app (lam visible (abs "x" cod)) x)
 
 --Try an action (usually unification) but continue without it
 -- if it fails
