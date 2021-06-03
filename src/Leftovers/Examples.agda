@@ -18,7 +18,7 @@ open import Data.Unit
 
 
 notNot :  ∀ b → not (not b) ≡ b
-notNot = getNormal (by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) (refl , refl)) -- (refl , refl)
+notNot = (by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) ?) -- (refl , refl)
 
 -- applyTo : ∀ {ℓ1 ℓ2} {X : Set ℓ1} { Y : Set ℓ2 } → (X → Y) → X → Y
 -- applyTo f x = f x
@@ -33,10 +33,10 @@ notNot = getNormal (by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) (r
 
 
 
-plusZero' : ∀ n → n ≡ n + 0
-plusZero' = getNormal
-  ((the ((zero ≡ zero × (∀ x → suc x ≡ suc x + 0)) → ∀ n → n ≡ n + 0) λ h → identity (λ { zero → proj₁ h ; (suc x) → (proj₂ h) x }))
-    (refl , λ x → cong suc (plusZero' x)))
+-- plusZero' : ∀ n → n ≡ n + 0
+-- plusZero' = getNormal
+--   ((the ((zero ≡ zero × (∀ x → suc x ≡ suc x + 0)) → ∀ n → n ≡ n + 0) λ h → identity (λ { zero → proj₁ h ; (suc x) → (proj₂ h) x }))
+--     (refl , λ x → cong suc (plusZero' x)))
 
 -- -- plusZero'' : ∀ n → n ≡ n + 0
 -- -- plusZero'' = (the (zero ≡ zero → (∀ x → suc x ≡ suc x + 0) → ∀ n → n ≡ n + 0) λ h1 h2 → (λ { zero → h1 ; (suc x) → h2 x})) refl  ((the (Dummy → ∀ x → suc x ≡ suc x + 0) (λ {dummy → λ x → cong suc (plusZero'' x)})) dummy)

@@ -11,10 +11,11 @@ open import Reflection
 open import Reflection.Term
 open import Reflection.TypeChecking.Monad.Instances
 
-
+open import Data.Fin using (toℕ)
 
 open import Data.Unit
 open import Data.Nat as Nat hiding (_⊓_)
+open import Data.Nat.Show as NShow
 open import Data.Product
 open import Data.List as List
 import Data.Vec as Vec
@@ -142,7 +143,7 @@ findLeftovers theMacro goal =
     unify funType (pi (vArg productType) goalAbs)
 
     -- Run the given macro in the extended context
-    funBody <- extendContext (vArg productType) do
+    (funBody , numMetas) <- extendContext (vArg productType) do
       goalType ← case goalAbs of λ
         { (abs _ goalType) → return goalType }
     -- hole ← newMeta goalType
@@ -214,30 +215,41 @@ findLeftovers theMacro goal =
         let
           holeCtx = L.Hole.context hole
           numArgs = length holeCtx - 1
-          rhs =
-            (def (quote nthHole)
-              (vArg (lit (nat (List.length metas)))
-              -- ∷ hArg (quoteTerm nSet)
-              ∷ hArg (levels ⦂ levelsType)
-              ∷ hArg (sets ⦂ setsType)
-              ∷ vArg (Data.Fin.Reflection.toTerm i)
-              --TODO hidden args for context vars?
-              ∷ vArg (var numArgs [] ⦂ productType)
-              ∷ (List.map (λ n → vArg (var n [])) (List.upTo numArgs))))
+          rhs = var (numArgs + toℕ i) ((List.map (λ n → vArg (var n [])) (List.upTo numArgs)))
+            -- (def (quote nthHole)
+            --   (vArg (lit (nat (List.length metas)))
+            --   -- ∷ hArg (quoteTerm nSet)
+            --   ∷ hArg (levels ⦂ levelsType)
+            --   ∷ hArg (sets ⦂ setsType)
+            --   ∷ vArg (Data.Fin.Reflection.toTerm i)
+            --   --TODO hidden args for context vars?
+            --   ∷ vArg (nthArg numArgs i ⦂ productType)
+            --   ∷ (List.map (λ n → vArg (var n [])) (List.upTo numArgs))))
         -- rhs ← makeDef rawRhs
         debugPrint "Hello" 2 (strErr "Unify LHS " ∷ strErr (showTerm (L.Hole.hole hole)) ∷ [] )
         debugPrint "Hello" 2 (strErr "Unify RHS " ∷ strErr (showTerm rhs) ∷ [] )
         unify (L.Hole.hole hole) (rhs ⦂ holeType)
       --Hack to help with termination
-      sep (body ⦂ goalType)
+      funBody ← sep (body ⦂ goalType)
+      return (funBody , List.length metas)
     --Produce the function that gives the result of the last macro
-    unify goal ((lam visible (abs "holes" funBody)) ⦂ funType )
+    let naryLamBody = weaken 1 (naryLam numMetas funBody  )
+    let
+      retBody =
+        lam visible
+          (abs "holes"
+            (app (def (quote uncurryₙ) (vArg numHoles ∷ hArg levels ∷ hArg sets ∷ vArg naryLamBody ∷ []))
+            (app (quoteTerm getHoles) (var 0 []))))
+    unify goal retBody
     finalResult ← reduce goal
     debugPrint "Hello" 2 (strErr "Final Result" ∷ termErr finalResult ∷ [])
     -- return tt
 
 
   where
+    naryLam : ℕ → Term → Term
+    naryLam 0 x = x
+    naryLam (suc n) x = lam visible (abs ("hole" String.++ NShow.show (suc n)) (naryLam n x))
 
     quoteLevels : ∀ {n} → Vec.Vec Term n → TC Term
     quoteLevels Vec.[] = return (con (quote Level.lift) (vArg (quoteTerm tt) ∷ []))
