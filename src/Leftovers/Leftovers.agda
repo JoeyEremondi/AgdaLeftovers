@@ -169,10 +169,21 @@ weakenMeta startSize newParams hole =
     fullCtx with (newCtx , startCtx) ← List.splitAt numNew (L.Hole.context hole)
       = newCtx ++ newParams ++ startCtx
 
+-- Given the length of the current context
+-- and a meta in a possibly deeper context
+-- return the type of the meta in the original context
+-- e.g. a function type abstracting over any new variables
+abstractMetaType : ℕ → (L.Hole × Type) → Type
+abstractMetaType numStart (hole , ty) =
+  foldr (λ param ty → pi param (abs "hole" ty)) ty
+    (take (length (L.Hole.context hole) - numStart) (L.Hole.context hole))
+
 
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → Term → TC ⊤
 findLeftovers goalSet theMacro goal =
   do
+    startContext ← getContext
+    let startCtxLen = List.length startContext
     goalType ← quoteTC goalSet
     -- We're producing a function from hole-fills to the goal type
     funType ← inferType goal
@@ -195,7 +206,7 @@ findLeftovers goalSet theMacro goal =
 
     -- Run the given macro on a fresh hole
     debugPrint "Leftovers" 2 (strErr "goalType before run theMacro" ∷ termErr goalType ∷ [])
-    (body , allMetas) ← L.runLeftovers
+    (body , _) ← L.runLeftovers
         ((L.freshMeta goalType) L.>>=
         λ hole → theMacro hole L.>> L.pure hole)
     metas ← getMetas body
@@ -206,9 +217,13 @@ findLeftovers goalSet theMacro goal =
       -- Now we know how many arguments we need to take
     unify (lit (nat numMetas)) numHoles
     debugPrint "Leftovers" 2 (strErr "Unified num holes " ∷ [])
-      -- Function to get the ith metavariable from the argument
-      -- accessor i as = projₙ (List.length metas) {ls = nSet} {as = as} i
-    holeTypes <- VCat.TraversableM.forM {a = Level.zero} {n = numMetas} tcMonad (metaVec) (λ hole → inferType (L.Hole.hole hole))
+    -- Get the type of each hole *in its context*
+    holesWithTypes <- VCat.TraversableM.forM {a = Level.zero} {n = numMetas} tcMonad (metaVec)
+      λ hole → inContext (L.Hole.context hole) do
+             debugPrint "" 2 (strErr "Getting type of hole " ∷ strErr (showTerm (L.Hole.hole hole) ) ∷ [])
+             ty ← inferType (L.Hole.hole hole)
+             return (hole , ty)
+    let holeTypes = Vec.map (abstractMetaType startCtxLen) holesWithTypes
     debugPrint "Leftovers" 2 (strErr "Got holes types " ∷ [])
     debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
     let setsFromTypes = quoteSets holeTypes
@@ -218,10 +233,8 @@ findLeftovers goalSet theMacro goal =
       -- Now we know the types of our holes
     unify sets setsFromTypes
     unify levels levelsFromTypes
-    currentContext ← getContext
-    let currentCtxLen = length currentContext
     -- Add the parameters to the context for each meta, and pair it with its index
-    let indexedMetas = (Vec.zip (Vec.allFin _) (Vec.map (weakenMeta currentCtxLen (Vec.toList (Vec.map vArg holeTypes))) metaVec))
+    let indexedMetas = (Vec.zip (Vec.allFin _) (Vec.map (weakenMeta startCtxLen (Vec.toList (Vec.map vArg holeTypes))) metaVec))
     -- Replace the ith meta with the ith element of the HList
     forM (Vec.toList indexedMetas) λ ( i , hole ) → inContext (L.Hole.context hole) do
       -- TODO is this bad? why re-infer?
