@@ -154,6 +154,22 @@ getMetas t = do
               )
     return (List.deduplicate L.equivDec metaList)
 
+-- Given the size of the starting context, a hole,
+-- and the list of parameters to add to the start context,
+-- Generate a new hole whose context has the new parameters
+-- inserted into the middle.
+-- We need this because a meta might occur in a deeper scope than
+-- where we're inserting the new variables.
+weakenMeta : ℕ → List (Arg Type) → L.Hole → L.Hole
+weakenMeta startSize newParams hole =
+  L.mkHole (Reflection.DeBruijn.weakenFrom (numNew + 1) (length newParams) (L.Hole.hole hole)) fullCtx
+  where
+    numNew = List.length (L.Hole.context hole) - startSize
+    fullCtx : List (Arg Type)
+    fullCtx with (newCtx , startCtx) ← List.splitAt numNew (L.Hole.context hole)
+      = newCtx ++ newParams ++ startCtx
+
+
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → Term → TC ⊤
 findLeftovers goalSet theMacro goal =
   do
@@ -183,9 +199,8 @@ findLeftovers goalSet theMacro goal =
         ((L.freshMeta goalType) L.>>=
         λ hole → theMacro hole L.>> L.pure hole)
     metas ← getMetas body
-    let
-        indexedMetas = (Vec.zip (Vec.allFin _) (Vec.fromList metas))
-        numMetas = length metas
+    let numMetas = length metas
+    let metaVec = Vec.fromList metas
     debugPrint "Leftovers" 2 (strErr "All holes " ∷ [])
       -- debugPrint "Leftovers" 2 (strErr "All holes " ∷ List.map (λ m → termErr (L.Hole.hole m)) metas)
       -- Now we know how many arguments we need to take
@@ -193,36 +208,28 @@ findLeftovers goalSet theMacro goal =
     debugPrint "Leftovers" 2 (strErr "Unified num holes " ∷ [])
       -- Function to get the ith metavariable from the argument
       -- accessor i as = projₙ (List.length metas) {ls = nSet} {as = as} i
-    holeTypes <- VCat.TraversableM.forM {a = Level.zero} {n = numMetas} tcMonad indexedMetas
-        λ {(i , hole) →  inferHoleType hole }
+    holeTypes <- VCat.TraversableM.forM {a = Level.zero} {n = numMetas} tcMonad (metaVec) (λ hole → inferType (L.Hole.hole hole))
     debugPrint "Leftovers" 2 (strErr "Got holes types " ∷ [])
-      -- debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
+    debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
     let setsFromTypes = quoteSets holeTypes
     debugPrint "Hello" 2 (strErr "Made sets " ∷ strErr (showTerm setsFromTypes) ∷ [])
     levelsFromTypes ← quoteLevels holeTypes
-    debugPrint "Hello" 2 (strErr "Made levels " ∷ [])
     debugPrint "Hello" 2 (strErr "Made levels " ∷ strErr (showTerm levelsFromTypes) ∷ [])
       -- Now we know the types of our holes
     unify sets setsFromTypes
     unify levels levelsFromTypes
+    currentContext ← getContext
+    let currentCtxLen = length currentContext
+    -- Add the parameters to the context for each meta, and pair it with its index
+    let indexedMetas = (Vec.zip (Vec.allFin _) (Vec.map (weakenMeta currentCtxLen (Vec.toList (Vec.map vArg holeTypes))) metaVec))
     -- Replace the ith meta with the ith element of the HList
     forM (Vec.toList indexedMetas) λ ( i , hole ) → inContext (L.Hole.context hole) do
-      -- let lhs = (meta mt (List.map proj₂ ctx))
+      -- TODO is this bad? why re-infer?
         holeType ← inferType (L.Hole.hole hole)
         let
-          holeCtx = L.Hole.context hole
-          numArgs = length holeCtx - 1
-          rhs = var (numArgs + toℕ i) ((List.map (λ n → vArg (var n [])) (List.upTo numArgs)))
-            -- (def (quote nthHole)
-            --   (vArg (lit (nat (List.length metas)))
-            --   -- ∷ hArg (quoteTerm nSet)
-            --   ∷ hArg (levels ⦂ levelsType)
-            --   ∷ hArg (sets ⦂ setsType)
-            --   ∷ vArg (Data.Fin.Reflection.toTerm i)
-            --   --TODO hidden args for context vars?
-            --   ∷ vArg (nthArg numArgs i ⦂ productType)
-            --   ∷ (List.map (λ n → vArg (var n [])) (List.upTo numArgs))))
-        -- rhs ← makeDef rawRhs
+           holeCtx = L.Hole.context hole
+           numArgs = length holeCtx - 1
+           rhs = var (numArgs + toℕ i) ((List.map (λ n → vArg (var n [])) (List.upTo numArgs)))
         debugPrint "Hello" 2 (strErr "Unify LHS " ∷ strErr (showTerm (L.Hole.hole hole)) ∷ [] )
         debugPrint "Hello" 2 (strErr "Unify RHS " ∷ strErr (showTerm rhs) ∷ [] )
         unify (L.Hole.hole hole) (rhs ⦂ holeType)
