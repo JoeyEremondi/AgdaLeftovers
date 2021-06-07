@@ -1,6 +1,8 @@
 {-# OPTIONS --without-K #-}
 module Leftovers.Leftovers where
 
+open import Function using (_$_)
+open import Data.Bool
 import Data.String as String
 
 open import Leftovers.TraverseTerm
@@ -12,7 +14,7 @@ open import Reflection.Term
 open import Reflection.TypeChecking.Monad.Instances
 open import Reflection.Argument using (unArg)
 
-open import Data.Fin using (toℕ)
+open import Data.Fin using (toℕ ; Fin)
 
 open import Data.Unit
 open import Data.Nat as Nat hiding (_⊓_)
@@ -20,6 +22,7 @@ open import Data.Nat.Show as NShow
 open import Data.Product
 open import Data.List as List
 import Data.Vec as Vec
+open import Data.Vec using (Vec)
 import Data.Vec.Categorical as VCat
 
 
@@ -132,7 +135,7 @@ getMetas t = do
     debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normTerm ∷ [])
     let
         handleMetas : _ → Meta → Data.Maybe.Maybe L.Hole
-        handleMetas ctx m = just (L.mkHole (meta m (List.map (λ x → vArg (var x [])) (List.downFrom (length ctx + 1 )))) (List.map proj₂ ctx))
+        handleMetas ctx m = just (L.mkHole m (meta m (List.map (λ x → vArg (var x [])) (List.downFrom (length ctx + 1 )))) (List.map proj₂ ctx))
     debugPrint "L" 2 (strErr "After ALLMETAS " ∷ [])
       -- debugPrint "L" 2 (strErr "ALLMETAS NORM " ∷ List.map termErr normMetas)
     let metaList =  (collectFromSubterms
@@ -181,6 +184,47 @@ injectParameters currentCtx injectedCtx t = everywhere defaultActions freshenMet
       newMeta mtype
     freshenMeta innerVars t = return t
 
+open import Data.Maybe using (Maybe ; just ; nothing)
+
+record MacroResult : Set where
+  constructor macroResult
+  field
+    body : Term
+    numMetas : ℕ
+    holes : Vec L.Hole numMetas
+    types : Vec Type numMetas
+    indices : Meta → Maybe (Fin numMetas)
+
+getMacroHoles : Type → List (Arg Type) → (Term → L.Leftovers ⊤) → TC MacroResult
+getMacroHoles targetType ctx theMacro = runSpeculative $
+      do
+        (body , _) ← L.runLeftovers
+          ((L.freshMeta targetType) L.>>=
+          λ hole → theMacro hole L.>> L.pure hole)
+        metas ← getMetas body
+        let metaVec = Vec.fromList metas
+        debugPrint "Leftovers" 2 (strErr "All holes " ∷ [])
+      -- debugPrint "Leftovers" 2 (strErr "All holes " ∷ List.map (λ m → termErr (L.Hole.hole m)) metas)
+      -- Now we know how many arguments we need to take
+        debugPrint "Leftovers" 2 (strErr "Unified num holes " ∷ [])
+    -- Get the type of each hole *in its context*
+        types <- VCat.TraversableM.forM {a = Level.zero} {n = length metas} tcMonad (metaVec)
+          λ hole → inContext (L.Hole.context hole ++ ctx) do
+             -- debugPrint "" 2 (strErr "Context : " ∷ strErr (String.intersperse ",, " (List.map (λ x → showTerm (unArg x)) (contextForHole hole))) ∷ [])
+             debugPrint "" 2 (strErr "Getting type of hole " ∷ termErr ( (L.Hole.hole hole) ) ∷ strErr " !" ∷  [])
+             ty ← inferType (L.Hole.hole hole)
+             debugPrint "" 2 [ strErr "got type" ]
+             return ty
+        let indexedHoles = (Vec.zip (Vec.allFin _) metaVec)
+        let
+          indexForMeta m =
+            Data.Maybe.map proj₁ $
+              head (filter (λ y → m Meta.≟ L.Hole.holeMeta (proj₂ y)) (Vec.toList indexedHoles))
+        return (macroResult body _ metaVec types indexForMeta , false) -- ((body , metas , types) , false)
+        where
+          open import Reflection.Meta as Meta
+
+
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → Term → TC ⊤
 findLeftovers targetSet theMacro goal =
   do
@@ -217,39 +261,24 @@ findLeftovers targetSet theMacro goal =
     -- Run the given macro on a fresh hole
     -- in a context extended with the argument with the Holes
     debugPrint "Leftovers" 2 (strErr "goalType before run theMacro" ∷ termErr targetType ∷ [])
-    (body , metas) ← extendContext (vArg productType)
-      do
-        (body , _) ← L.runLeftovers
-          ((L.freshMeta targetType) L.>>=
-          λ hole → theMacro hole L.>> L.pure hole)
-        metas ← getMetas body
-        return (body , metas)
-    let numMetas = length metas
-    let metaVec = Vec.fromList metas
-    debugPrint "Leftovers" 2 (strErr "All holes " ∷ [])
-      -- debugPrint "Leftovers" 2 (strErr "All holes " ∷ List.map (λ m → termErr (L.Hole.hole m)) metas)
-      -- Now we know how many arguments we need to take
-    debugPrint "Leftovers" 2 (strErr "Unified num holes " ∷ [])
-    -- Get the type of each hole *in its context*
-    holesWithTypes <- VCat.TraversableM.forM {a = Level.zero} {n = numMetas} tcMonad (metaVec)
-      λ hole → inContext (contextForHole hole) do
-             debugPrint "" 2 (strErr "Context : " ∷ strErr (String.intersperse ",, " (List.map (λ x → showTerm (unArg x)) (contextForHole hole))) ∷ [])
-             debugPrint "" 2 (strErr "Getting type of hole " ∷ termErr ( (L.Hole.hole hole) ) ∷ strErr " !" ∷  [])
-             ty ← inferType (L.Hole.hole hole)
-             debugPrint "" 2 [ strErr "got type" ]
-             return (hole , ty)
-    let holeTypes = Vec.map (abstractMetaType startCtxLen) holesWithTypes
+    result ← extendContext (vArg productType) $ getMacroHoles targetType startContext theMacro
+    let numMetas = MacroResult.numMetas result
     debugPrint "Leftovers" 2 (strErr "Got holes types " ∷ [])
-    debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
-    let setsFromTypes = quoteSets holeTypes
+    -- debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
+    let setsFromTypes = quoteSets (MacroResult.types result)
     debugPrint "Hello" 2 (strErr "Made sets " ∷ strErr (showTerm setsFromTypes) ∷ [])
-    levelsFromTypes ← quoteLevels holeTypes
+    levelsFromTypes ← quoteLevels (MacroResult.types result)
     debugPrint "Hello" 2 (strErr "Made levels " ∷ strErr (showTerm levelsFromTypes) ∷ [])
       -- Now we know the types of our holes
     unify sets setsFromTypes
     unify levels levelsFromTypes
+
+    --This gives us enough information to make a function parameterized over the types of holes
+    --We traverse the result of the macro, replacing each meta with a parameter
+    --and wrap the hole thing in an n-ary lambda taking parameters of the hole types
+
     -- Pair each meta with its index
-    let indexedMetas = (Vec.zip (Vec.allFin _) metaVec)
+    let indexedMetas = (Vec.zip (Vec.allFin _) (Vec.fromList {!!}))
     -- Replace the ith meta with the ith element of the HList
     forM (Vec.toList indexedMetas) λ ( i , hole ) → inContext (contextForHole hole) do
       -- TODO is this bad? why re-infer?
@@ -259,7 +288,7 @@ findLeftovers targetSet theMacro goal =
            numArgs = length holeCtx
            rhs =
             (def (quote nthHole)
-              (vArg (lit (nat (List.length metas)))
+              (vArg (lit (nat (length {!!})))
               -- ∷ hArg (quoteTerm nSet)
               ∷ hArg (levels ⦂ levelsType)
               ∷ hArg (sets ⦂ setsType)
@@ -272,7 +301,7 @@ findLeftovers targetSet theMacro goal =
         unify (L.Hole.hole hole) (rhs )
         debugPrint "" 2 (strErr "done unify" ∷ [])
       --Hack to help with termination
-    let funBody = (body ⦂ targetType)
+    let funBody = (MacroResult.body result ⦂ targetType)
     debugPrint "" 2 (strErr "done sep" ∷ [])
     -- return (funBody , List.length metas)
     --Produce the function that gives the result of the last macro
@@ -371,4 +400,3 @@ macro
 
 default : {A : Set} → A → Term → TC ⊤
 default x hole = bindTC (quoteTC x) (unify hole)
-
