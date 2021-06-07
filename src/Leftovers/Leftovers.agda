@@ -110,6 +110,7 @@ sep t = do
   return ret
 
 open import Reflection.DeBruijn using (weaken)
+open import Leftovers.Everywhere tcMonad
 
 -- Hack using case-lambda to convince Agda that a term is a definition
 -- Helps with the termination checker
@@ -160,14 +161,14 @@ getMetas t = do
 -- inserted into the middle.
 -- We need this because a meta might occur in a deeper scope than
 -- where we're inserting the new variables.
-weakenMeta : ℕ → List (Arg Type) → L.Hole → L.Hole
-weakenMeta startSize newParams hole =
-  L.mkHole (Reflection.DeBruijn.weakenFrom (numNew + 1) (length newParams) (L.Hole.hole hole)) fullCtx
-  where
-    numNew = List.length (L.Hole.context hole) - startSize
-    fullCtx : List (Arg Type)
-    fullCtx with (newCtx , startCtx) ← List.splitAt numNew (L.Hole.context hole)
-      = newCtx ++ newParams ++ startCtx
+-- weakenMeta : ℕ → List (Arg Type) → L.Hole → L.Hole
+-- weakenMeta startSize newParams hole =
+--   L.mkHole (Reflection.DeBruijn.weakenFrom (numNew + 1) (length newParams) (L.Hole.hole hole)) fullCtx
+--   where
+--     numNew = List.length (L.Hole.context hole) - startSize
+--     fullCtx : List (Arg Type)
+--     fullCtx with (newCtx , startCtx) ← List.splitAt numNew (L.Hole.context hole)
+--       = newCtx ++ newParams ++ startCtx
 
 -- Given the length of the current context
 -- and a meta in a possibly deeper context
@@ -178,7 +179,17 @@ abstractMetaType numStart (hole , ty) =
   foldr (λ param ty → pi param (abs "hole" ty)) ty
     (take (length (L.Hole.context hole) - numStart) (L.Hole.context hole))
 
-
+-- Given the size of the current context and a list of new parameter types to add
+-- freshen all metas to take new parameters and weaken DeBruijn variables accordingly
+-- Also forgets any blocked constraints on those metas, since they're replaced by new ones
+injectParameters : List Type → List Type → Term → TC Term
+injectParameters currentCtx injectedCtx t = everywhere defaultActions freshenMeta  (weaken (length injectedCtx) t)
+  where
+    freshenMeta : Cxt → Term → TC Term
+    freshenMeta innerVars (meta m xs) = do
+      mtype ← inferType (meta m xs)
+      newMeta mtype
+    freshenMeta innerVars t = return t
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → Term → TC ⊤
 findLeftovers goalSet theMacro goal =
   do
@@ -234,7 +245,7 @@ findLeftovers goalSet theMacro goal =
     unify sets setsFromTypes
     unify levels levelsFromTypes
     -- Add the parameters to the context for each meta, and pair it with its index
-    let indexedMetas = (Vec.zip (Vec.allFin _) (Vec.map (weakenMeta startCtxLen (Vec.toList (Vec.map vArg holeTypes))) metaVec))
+    let indexedMetas = (Vec.zip (Vec.allFin _) metaVec)
     -- Replace the ith meta with the ith element of the HList
     forM (Vec.toList indexedMetas) λ ( i , hole ) → inContext (L.Hole.context hole) do
       -- TODO is this bad? why re-infer?

@@ -2,10 +2,12 @@
 module Leftovers.TraverseTerm where
 
 open import Data.List
+-- We only need the writer monad, but as far as I can tell
+-- it's not in the Agda stdlib
 open import Category.Monad.State
 
 open import Reflection using (Term ; Meta ; Name ; Arg)
-import Reflection.Traversal
+import Leftovers.Everywhere
 
 open import Relation.Binary.PropositionalEquality
 
@@ -26,13 +28,13 @@ record LeafInfoMaker (A : Set) : Set where
     onCon : LCxt → Name → Maybe A
     onDef : LCxt → Name → Maybe A
 
-collectFromSubterms : ∀ {A} → LeafInfoMaker A → Term → List A
+collectFromSubterms : ∀ {A : Set} → LeafInfoMaker A → Term → List A
 collectFromSubterms {A} f t = proj₂ (stateResult [])
  where
    open RawMonadState (StateMonadState (List A))
-   open import Reflection.Traversal rawIApplicative using (traverseTerm ; Action ; Cxt)
+   open import Leftovers.Everywhere (StateMonad (List A))
 
-   toAction : ∀ {X} → (LCxt → X → Maybe A) → Action X
+   toAction : ∀ {X : Set} → (LCxt → X → Maybe A) → Action X
    toAction f cxt x with f (Cxt.context cxt) x
    ... | nothing = return x
    ... | just fx =
@@ -42,8 +44,8 @@ collectFromSubterms {A} f t = proj₂ (stateResult [])
 
    stateResult : State (List A) Term
    stateResult =
-        traverseTerm (record
+        everywhere (record
           { onVar = toAction (LeafInfoMaker.onVar f)
           ; onMeta = toAction (LeafInfoMaker.onMeta f)
           ; onCon = toAction (LeafInfoMaker.onCon f)
-          ; onDef = toAction (LeafInfoMaker.onDef f) }) (0 Reflection.Traversal., []) t
+          ; onDef = toAction (LeafInfoMaker.onDef f) }) (λ Γ x → return x) t

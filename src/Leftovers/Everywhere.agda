@@ -9,7 +9,7 @@
 open import Category.Applicative using (RawApplicative)
 open import Category.Monad using (RawMonad)
 
-module Leftovers.FullTraversal {F : Set → Set} (MF : RawMonad F) where
+module Leftovers.Everywhere {F : Set → Set} (MF : RawMonad F) where
 
 open import Data.Nat     using (ℕ; zero; suc; _+_)
 open import Data.List    using (List; []; _∷_; _++_; reverse; length)
@@ -26,7 +26,7 @@ open RawMonad MF
 -- Track both number of variables and actual context, to avoid having to
 -- compute the length of the context everytime it's needed.
 record Cxt : Set where
-  constructor _,_
+  constructor _,,_
   pattern
   field
     len     : ℕ
@@ -34,17 +34,16 @@ record Cxt : Set where
 
 private
   _∷cxt_ : String × Arg Term → Cxt → Cxt
-  e ∷cxt (n , Γ) = (suc n , e ∷ Γ)
+  e ∷cxt (n ,, Γ) = (suc n ,, (e ∷ Γ))
 
   _++cxt_ : List (String × Arg Term) → Cxt → Cxt
-  es ++cxt (n , Γ) = (length es + n , es ++ Γ)
+  es ++cxt (n ,, Γ) = ((length es + n) ,, (es ++ Γ))
 
 ------------------------------------------------------------------------
 -- Actions
 
 Action : Set → Set
 Action A = Cxt → A → F A
-
 -- A traversal gets to operate on variables, metas, and names.
 record Actions : Set where
   field
@@ -62,8 +61,8 @@ defaultActions .Actions.onDef  _ = pure
 
 ------------------------------------------------------------------------
 -- Traversal functions
-
-module _ (actions : Actions) (everyAction : Action Term) where
+private
+ module Params (actions : Actions) (everyAction : Action Term) where
 
   open Actions actions
 
@@ -133,3 +132,6 @@ module _ (actions : Actions) (everyAction : Action Term) where
 
   everywherePats Γ [] = pure []
   everywherePats Γ (arg i p ∷ ps) = _∷_ ∘ arg i <$> everywherePattern Γ p ⊛ everywherePats Γ ps
+
+everywhere : (actions : Actions) → (everyAction : Action Term) → Term → F Term
+everywhere actions every = Params.everywhereTerm actions every (0 ,, [])
