@@ -10,6 +10,7 @@ import Level as Level
 open import Reflection
 open import Reflection.Term
 open import Reflection.TypeChecking.Monad.Instances
+open import Reflection.Argument using (unArg)
 
 open import Data.Fin using (toℕ)
 
@@ -131,22 +132,10 @@ getMetas t = do
     debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normTerm ∷ [])
     let
         handleMetas : _ → Meta → Data.Maybe.Maybe L.Hole
-        handleMetas ctx m = just (L.mkHole (meta m (vArg (var 0 []) ∷ List.map proj₂ ctx)) (List.map proj₂ ctx))
-          --
-      -- debugPrint "L" 2 (strErr "Before ALLMETAS " ∷ [])
-      -- debugPrint "L" 2 (strErr "ALLMETAS " ∷ List.map (λ x → strErr (showTerm (L.Hole.hole x))) allMetas)
-      -- normMetas ← forM allMetas λ hole → do
-      --   debugPrint "L" 2 (strErr ("normalizing " String.++ (showTerm (L.Hole.hole hole))) ∷ [])
-      --   inContext (L.Hole.context hole) (normalise (L.Hole.hole hole))
+        handleMetas ctx m = just (L.mkHole (meta m (List.map (λ x → vArg (var x [])) (List.downFrom (length ctx + 1 )))) (List.map proj₂ ctx))
     debugPrint "L" 2 (strErr "After ALLMETAS " ∷ [])
       -- debugPrint "L" 2 (strErr "ALLMETAS NORM " ∷ List.map termErr normMetas)
-    metaList ←
-    -- metaList ←
-    --       forM allMetas λ hole → inContext (L.Hole.context hole) do
-    --         debugPrint "L" 2 (strErr "getting subMetas from" ∷ strErr (showTerm (L.Hole.hole hole)) ∷ [])
-    --         nf ← normalise (L.Hole.hole hole)
-            -- debugPrint "L" 2 (strErr ("normalized " String.++ (showTerm (L.Hole.hole )) String.++  " to ") ∷ termErr nf ∷ [])
-            return (collectFromSubterms
+    let metaList =  (collectFromSubterms
                       (record
                         { onVar = λ _ _ → nothing
                         ; onMeta = handleMetas
@@ -179,6 +168,7 @@ abstractMetaType numStart (hole , ty) =
   foldr (λ param ty → pi param (abs "hole" ty)) ty
     (take (length (L.Hole.context hole) - numStart) (L.Hole.context hole))
 
+
 -- Given the size of the current context and a list of new parameter types to add
 -- freshen all metas to take new parameters and weaken DeBruijn variables accordingly
 -- Also forgets any blocked constraints on those metas, since they're replaced by new ones
@@ -190,15 +180,13 @@ injectParameters currentCtx injectedCtx t = everywhere defaultActions freshenMet
       mtype ← inferType (meta m xs)
       newMeta mtype
     freshenMeta innerVars t = return t
+
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → Term → TC ⊤
-findLeftovers goalSet theMacro goal =
+findLeftovers targetSet theMacro goal =
   do
     startContext ← getContext
     let startCtxLen = List.length startContext
-    goalType ← quoteTC goalSet
-    -- We're producing a function from hole-fills to the goal type
-    funType ← inferType goal
-    debugPrint "Leftovers" 2 (strErr "Goal function type " ∷ termErr funType ∷ [])
+    targetType ← quoteTC targetSet
     -- Unification variable for number of holes, we don't know how many yet
     numHoles ← newMeta (quoteTerm ℕ)
     -- Unification variables for the HVec of holes
@@ -207,6 +195,17 @@ findLeftovers goalSet theMacro goal =
     let setsType = (def (quote Sets) (vArg numHoles ∷ vArg levels ∷ []))
     sets ← newMeta setsType
     let productType = def (quote Holes) (vArg numHoles ∷ vArg levels ∷ vArg sets ∷ [])
+
+    -- Make sure the type of the function we produce matches (unifies with)
+    -- (Holes -> Target Type)
+    let funType = pi (vArg productType) (abs "holes" targetType)
+    checkType goal funType
+    let extContext = vArg productType ∷ startContext
+    let
+      contextForHole : L.Hole → List (Arg Type)
+      contextForHole hole = (L.Hole.context hole) ++ extContext
+
+    debugPrint "Leftovers" 2 (strErr "Goal function type " ∷ termErr funType ∷ [])
     -- The return type of the function we're producing
     -- (argType , goalAbs) ← case funType of λ
     --   { (pi (arg _ dom) cod) → return (dom , cod)
@@ -216,23 +215,28 @@ findLeftovers goalSet theMacro goal =
     -- unify funType (pi (vArg productType) goalAbs)
 
     -- Run the given macro on a fresh hole
-    debugPrint "Leftovers" 2 (strErr "goalType before run theMacro" ∷ termErr goalType ∷ [])
-    (body , _) ← L.runLeftovers
-        ((L.freshMeta goalType) L.>>=
-        λ hole → theMacro hole L.>> L.pure hole)
-    metas ← getMetas body
+    -- in a context extended with the argument with the Holes
+    debugPrint "Leftovers" 2 (strErr "goalType before run theMacro" ∷ termErr targetType ∷ [])
+    (body , metas) ← extendContext (vArg productType)
+      do
+        (body , _) ← L.runLeftovers
+          ((L.freshMeta targetType) L.>>=
+          λ hole → theMacro hole L.>> L.pure hole)
+        metas ← getMetas body
+        return (body , metas)
     let numMetas = length metas
     let metaVec = Vec.fromList metas
     debugPrint "Leftovers" 2 (strErr "All holes " ∷ [])
       -- debugPrint "Leftovers" 2 (strErr "All holes " ∷ List.map (λ m → termErr (L.Hole.hole m)) metas)
       -- Now we know how many arguments we need to take
-    unify (lit (nat numMetas)) numHoles
     debugPrint "Leftovers" 2 (strErr "Unified num holes " ∷ [])
     -- Get the type of each hole *in its context*
     holesWithTypes <- VCat.TraversableM.forM {a = Level.zero} {n = numMetas} tcMonad (metaVec)
-      λ hole → inContext (L.Hole.context hole) do
-             debugPrint "" 2 (strErr "Getting type of hole " ∷ strErr (showTerm (L.Hole.hole hole) ) ∷ [])
+      λ hole → inContext (contextForHole hole) do
+             debugPrint "" 2 (strErr "Context : " ∷ strErr (String.intersperse ",, " (List.map (λ x → showTerm (unArg x)) (contextForHole hole))) ∷ [])
+             debugPrint "" 2 (strErr "Getting type of hole " ∷ termErr ( (L.Hole.hole hole) ) ∷ strErr " !" ∷  [])
              ty ← inferType (L.Hole.hole hole)
+             debugPrint "" 2 [ strErr "got type" ]
              return (hole , ty)
     let holeTypes = Vec.map (abstractMetaType startCtxLen) holesWithTypes
     debugPrint "Leftovers" 2 (strErr "Got holes types " ∷ [])
@@ -244,31 +248,35 @@ findLeftovers goalSet theMacro goal =
       -- Now we know the types of our holes
     unify sets setsFromTypes
     unify levels levelsFromTypes
-    -- Add the parameters to the context for each meta, and pair it with its index
+    -- Pair each meta with its index
     let indexedMetas = (Vec.zip (Vec.allFin _) metaVec)
     -- Replace the ith meta with the ith element of the HList
-    forM (Vec.toList indexedMetas) λ ( i , hole ) → inContext (L.Hole.context hole) do
+    forM (Vec.toList indexedMetas) λ ( i , hole ) → inContext (contextForHole hole) do
       -- TODO is this bad? why re-infer?
         holeType ← inferType (L.Hole.hole hole)
         let
            holeCtx = L.Hole.context hole
-           numArgs = length holeCtx - 1
-           rhs = var (numArgs + toℕ i) ((List.map (λ n → vArg (var n [])) (List.upTo numArgs)))
+           numArgs = length holeCtx
+           rhs =
+            (def (quote nthHole)
+              (vArg (lit (nat (List.length metas)))
+              -- ∷ hArg (quoteTerm nSet)
+              ∷ hArg (levels ⦂ levelsType)
+              ∷ hArg (sets ⦂ setsType)
+              ∷ vArg (Data.Fin.Reflection.toTerm i)
+              --TODO hidden args for context vars?
+              ∷ vArg (var numArgs [] ⦂ productType)
+              ∷ (List.map (λ n → vArg (var n [])) (List.upTo numArgs))))
         debugPrint "Hello" 2 (strErr "Unify LHS " ∷ strErr (showTerm (L.Hole.hole hole)) ∷ [] )
         debugPrint "Hello" 2 (strErr "Unify RHS " ∷ strErr (showTerm rhs) ∷ [] )
-        unify (L.Hole.hole hole) (rhs ⦂ holeType)
+        unify (L.Hole.hole hole) (rhs )
+        debugPrint "" 2 (strErr "done unify" ∷ [])
       --Hack to help with termination
-    funBody ← sep (body ⦂ goalType)
+    let funBody = (body ⦂ targetType)
+    debugPrint "" 2 (strErr "done sep" ∷ [])
     -- return (funBody , List.length metas)
     --Produce the function that gives the result of the last macro
-    let naryLamBody = weaken 1 (naryLam numMetas funBody  )
-    let
-      retBody =
-        lam visible
-          (abs "holes"
-            (app (def (quote uncurryₙ) (vArg numHoles ∷ hArg levels ∷ hArg sets ∷ vArg naryLamBody ∷ []))
-            (app (quoteTerm getHoles) (var 0 []))))
-    unify goal retBody
+    unify goal ((lam visible (abs "holes" funBody)) ⦂ funType )
     finalResult ← reduce goal
     debugPrint "Hello" 2 (strErr "Final Result" ∷ termErr finalResult ∷ [])
     -- return tt
@@ -314,7 +322,7 @@ by' {n = n} _ {f} _ x = f (makeHoles x)
 
 -- by {n = n} _ {f} = curryₙ n (λ x → f (makeHoles x))
 
-
+open import Relation.Nullary
 
 -- syntax withLeftovers tac x = ► tac ⇒ x ◄
 macro
@@ -329,8 +337,25 @@ macro
     debugPrint "" 2 (strErr "get Normal goal type " ∷ termErr goalType ∷ [])
     unify goalType ttype
     nf ← normalise t
+    nfSimplified ←  everywhere defaultActions action t
     debugPrint "" 2 (strErr "get Normal term nf " ∷ termErr nf ∷ [])
-    unify goal nf
+    unify goal nfSimplified
+    where
+      open import Reflection.Name as N
+      action : Cxt → Term → TC Term
+      action ctx t@(def gholes (arg _ arg1 ∷ []) ) = do
+        case  (gholes N.≟ quote getHoles) of λ
+          { (yes _) → do
+            nf1 ← normalise arg1
+            case nf1 of λ
+              { (def mholes (arg _ tup ∷ [])) →
+                case (mholes N.≟ quote makeHoles) of λ
+                  {(yes _) → normalise tup
+                  ; (no _) → return t}
+              ; _ → return t}
+          ; (no _) → return t }
+
+      action _ t = return t
 
 
   -- applyNormal : ∀ {ℓ1 ℓ2} {X : Set ℓ1} {Y : Set ℓ2} → (X → Y) → X → Term → TC ⊤
