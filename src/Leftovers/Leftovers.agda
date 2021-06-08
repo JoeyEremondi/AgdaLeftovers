@@ -109,7 +109,9 @@ data Dummy : Set where
 
 sep : Term → TC Term
 sep t = do
+  debugPrint "" 2 (strErr "Finding sep for " ∷ strErr (showTerm t) ∷ [])
   ty ← inferType t
+  debugPrint "" 2 (strErr "sep got type " ∷ strErr (showTerm ty) ∷ [])
   let ret = (def (quote  identity) [ vArg t ]) ⦂ ty
   return ret
 
@@ -166,7 +168,7 @@ getMetas t = do
 -- e.g. a function type abstracting over any new variables
 abstractMetaType : ℕ → (L.Hole × Type) → Type
 abstractMetaType numStart (hole , ty) =
-  foldr (λ param ty → pi param (abs "hole" ty)) ty
+  foldr (λ param ty → pi param (abs "arg" ty)) ty
     (take (length (L.Hole.context hole) - numStart) (L.Hole.context hole))
 
 
@@ -278,9 +280,13 @@ findLeftovers targetSet theMacro goal =
     let numMetas = MacroResult.numMetas result
     debugPrint "Leftovers" 2 (strErr "Got holes types " ∷ [])
     -- debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
-    let setsFromTypes = quoteSets (MacroResult.types result)
+    let
+      abstractedTypes = (Vec.map (abstractMetaType startCtxLen)
+            (Vec.zip (MacroResult.holes result) (MacroResult.types result)))
+      setsFromTypes =
+        quoteSets abstractedTypes
     debugPrint "Hello" 2 (strErr "Made sets " ∷ strErr (showTerm setsFromTypes) ∷ [])
-    levelsFromTypes ← quoteLevels (MacroResult.types result)
+    levelsFromTypes ← quoteLevels abstractedTypes
     debugPrint "Hello" 2 (strErr "Made levels " ∷ strErr (showTerm levelsFromTypes) ∷ [])
       -- Now we know the types of our holes
     unify sets setsFromTypes
@@ -290,7 +296,8 @@ findLeftovers targetSet theMacro goal =
     --We traverse the result of the macro, replacing each meta with a parameter
     --and wrap the hole thing in an n-ary lambda taking parameters of the hole types
     funBody ← everywhere defaultActions (metaToArg result) (MacroResult.body result)
-
+    sepBody ← inContext (List.map vArg (List.reverse $ Vec.toList abstractedTypes) ++ startContext) $ sep funBody
+    -- let sepBody = funBody
     -- Pair each meta with its index
     -- let indexedMetas = (Vec.zip (Vec.allFin _) (Vec.fromList {!!}))
     -- -- Replace the ith meta with the ith element of the HList
@@ -315,18 +322,15 @@ findLeftovers targetSet theMacro goal =
     --     unify (L.Hole.hole hole) (rhs )
     --     debugPrint "" 2 (strErr "done unify" ∷ [])
       --Hack to help with termination
-    -- let funBody = (MacroResult.body result ⦂ targetType)
-    debugPrint "" 2 (strErr "got fun body " ∷ strErr (showTerm funBody) ∷ [])
-    nflam ← normalise (naryLam numMetas funBody ⦂ def (quote _⇉_) (vArg sets ∷ vArg targetType ∷ []))
+    debugPrint "" 2 (strErr "got fun body " ∷ strErr (showTerm sepBody) ∷ [])
+    nflam ← normalise (naryLam numMetas sepBody ⦂ def (quote _⇉_) (vArg sets ∷ vArg targetType ∷ []))
     debugPrint "" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
-    -- return (funBody , List.length metas)
     --Produce the function that gives the result of the last macro
-    unify goal (lam visible (abs "holes"
-      (app (def (quote uncurryₙ) (vArg numHoles ∷ vArg (naryLam numMetas funBody) ∷ []))
-      (def (quote getHoles) [ vArg (var 0 []) ])
-      )))
-    -- (def ? def {!!} (vArg (naryLam numMetas funBody ⦂ funType) ∷ []) )
-    finalResult ← reduce goal
+    let finalResult = (lam visible (abs "holes"
+                    (app (def (quote uncurryₙ) (vArg numHoles ∷ vArg (naryLam numMetas sepBody) ∷ []))
+                    (def (quote getHoles) [ vArg (var 0 []) ])
+                    )))
+    unify goal finalResult
     debugPrint "Hello" 2 (strErr "Final Result" ∷ termErr finalResult ∷ [])
     -- return tt
 

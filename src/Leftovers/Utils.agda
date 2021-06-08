@@ -26,11 +26,11 @@ case x of f = f x
 λv x ↦ body  = lam visible (abs x body)
 λh x ↦ body  = lam hidden (abs x body)
 
-identity : ∀ {ℓ} {@0 X : Set ℓ} → X → X
+identity : ∀ {ℓ} { X : Set ℓ} → X → X
 identity x = x
 
 
-the : ∀ {ℓ} → (@0 T : Set ℓ) → T → T
+the : ∀ {ℓ} → (T : Set ℓ) → T → T
 the _ = identity
 
 _⦂_ : Term → Type → Term
