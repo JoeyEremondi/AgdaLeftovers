@@ -18,7 +18,7 @@ open import Data.Unit
 
 
 notNot :  ∀ b → not (not b) ≡ b
-notNot = (by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) (refl , refl) (quote notNot)) -- (refl , refl)
+notNot = (by {A = ∀ b → not (not b) ≡ b} (quote notNot) (cases (quote Bool)) {!!} ) -- (refl , refl)
 
 -- applyTo : ∀ {ℓ1 ℓ2} {X : Set ℓ1} { Y : Set ℓ2 } → (X → Y) → X → Y
 -- applyTo f x = f x

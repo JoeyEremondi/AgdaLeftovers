@@ -47,25 +47,37 @@ import Data.Nat.Reflection
 
 import Leftovers.Monad as L
 
-data Holes (n : ℕ) (levels : Levels n) (sets : Sets n levels ) : Set (⨆ n levels)    where
-  makeHoles : Product n sets → Holes n levels sets
+lzeros : (n : ℕ) → Levels n
+lzeros zero = Level.lift tt
+lzeros (suc n) = Level.zero , (lzeros n)
 
-getHoles : ∀ {n ls sets} → Holes n ls sets → Product n sets
+Set0s : (n : ℕ) → Set (Level.suc (⨆ n (lzeros n)))
+Set0s n = Sets n (lzeros n)
+
+data Holes (n : ℕ) (sets : Set0s n ) : Set (⨆ n (lzeros n))   where
+  makeHoles : Product n sets → Holes n sets
+
+-- data ExHoles : Set where
+--   exHoles : ∀ (n : ℕ) (levels : Levels n) (sets : Sets n levels )
+--     → Holes n levels sets
+--     → ExHoles
+
+getHoles : ∀ {n sets} → Holes n  sets → Product n sets
 getHoles (makeHoles p) = p
 {-# INLINE getHoles #-}
 
-nthHole : ∀ n {ls} {as : Sets n ls } k → Holes n ls as → Projₙ as k
+nthHole : ∀ n  {as : Set0s n } k → Holes n  as → Projₙ as k
 nthHole n k h = projₙ n k (getHoles h)
 {-# INLINE nthHole #-}
 
-infixr 10 _∥_
+-- infixr 10 _∥-- _
 
-_∥_ : ∀ {n : ℕ} {levels : Levels n} {sets : Sets n levels}
-   {ℓ} {X : Set ℓ} →
-  Holes n levels sets → X →
-  Holes (suc n) (ℓ , levels) (X , sets)
-_∥_ {n = zero} {sets = sets} {X = X} holes x = makeHoles x
-_∥_ {n = suc n} {sets = sets} {X = X} holes x = makeHoles (x , getHoles holes)
+-- _∥_ : ∀ {n : ℕ} {levels : Levels n} {sets : Sets n levels}
+--    {ℓ} {X : Set ℓ} →
+--   Holes n  sets → X →
+--   Holes (suc n) (ℓ , levels) (X , sets)
+-- _∥_ {n = zero} {sets = sets} {X = X} holes x = makeHoles x
+-- _∥_ {n = suc n} {sets = sets} {X = X} holes x = makeHoles (x , getHoles holes)
 
 -- fillHoles : ∀ {ℓ} {n} {ls} {types : Sets n ls} {T : Set ℓ} → (Holes n ls types → T) → Product n types → T
 -- fillHoles f args = f (makeHoles args)
@@ -250,11 +262,11 @@ findLeftovers targetSet theMacro goal =
     -- Unification variable for number of holes, we don't know how many yet
     numHoles ← newMeta (quoteTerm ℕ)
     -- Unification variables for the HVec of holes
-    let levelsType = (def (quote Levels) (vArg numHoles ∷ []))
-    levels ← newMeta levelsType -- def (quote nSet) [ hArg numHoles ]
-    let setsType = (def (quote Sets) (vArg numHoles ∷ vArg levels ∷ []))
+    -- let levelsType = (def (quote Levels) (vArg numHoles ∷ []))
+    -- let levels = quoteTerm lzeros
+    let setsType = (def (quote Set0s) (vArg numHoles ∷ []))
     sets ← newMeta setsType
-    let productType = def (quote Holes) (vArg numHoles ∷ vArg levels ∷ vArg sets ∷ [])
+    let productType = def (quote Holes) (vArg numHoles ∷ vArg sets ∷ [])
 
     -- Make sure the type of the function we produce matches (unifies with)
     -- (Holes -> Target Type)
@@ -287,11 +299,12 @@ findLeftovers targetSet theMacro goal =
       setsFromTypes =
         quoteSets abstractedTypes
     debugPrint "Hello" 2 (strErr "Made sets " ∷ strErr (showTerm setsFromTypes) ∷ [])
-    levelsFromTypes ← quoteLevels abstractedTypes
-    debugPrint "Hello" 2 (strErr "Made levels " ∷ strErr (showTerm levelsFromTypes) ∷ [])
+    -- levelsFromTypes ← quoteLevels abstractedTypes
+    -- debugPrint "Hello" 2 (strErr "Made levels " ∷ strErr (showTerm levelsFromTypes) ∷ [])
       -- Now we know the types of our holes
+    unify numHoles (Data.Nat.Reflection.toTerm numMetas)
     unify sets setsFromTypes
-    unify levels levelsFromTypes
+    -- unify levels levelsFromTypes
 
     --This gives us enough information to make a function parameterized over the types of holes
     --We traverse the result of the macro, replacing each meta with a parameter
@@ -396,24 +409,17 @@ subName {X = X} nm f goal = do
 nameFix : ∀ {ℓ} {X : Set ℓ} → (f : X → X) → (n : Name) -> {@(tactic subName n f) x : X} -> X
 nameFix _ _ {x = x} = x
 
-by : ∀ {ℓ} {A : Set ℓ} {n} {ls} {types : Sets n ls}
-  → (theMacro : Term → L.Leftovers ⊤)
-  → {@(tactic findLeftovers A theMacro) f : Holes n ls types → A}
-  → (holes : {A} → Product n types)
+by : ∀ {ℓ} {A : Set ℓ} {n}  {types : Set0s n}
   → (selfName : Name)
+  → (theMacro : Term → L.Leftovers ⊤)
+  → {@(tactic findLeftovers A theMacro) f : Holes n types → A}
+  → (holes : {A} → Product n types)
   → {@(tactic subName selfName (λ rec → f (makeHoles (holes {rec})))) x : A}
   → A
 by _ _ _ {x = x} = x
 
 
 
-by' : ∀ {ℓ} {A : Set ℓ} {n} {ls} {types : Sets n ls}
-  → (theMacro : Term → L.Leftovers ⊤)
-  → {@(tactic findLeftovers A theMacro) f : Holes n ls types → A}
-  → ⊤ → Product n types → A
-by' {n = n} _ {f} _ x = f (makeHoles x)
-
--- by {n = n} _ {f} = curryₙ n (λ x → f (makeHoles x))
 
 open import Relation.Nullary
 
