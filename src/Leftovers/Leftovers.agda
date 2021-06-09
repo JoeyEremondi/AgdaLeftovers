@@ -43,6 +43,7 @@ import Category.Monad as Monad
 open import Level.Literals using (#_)
 
 import Data.Fin.Reflection
+import Data.Nat.Reflection
 
 import Leftovers.Monad as L
 
@@ -112,10 +113,10 @@ sep t = do
   debugPrint "" 2 (strErr "Finding sep for " ∷ strErr (showTerm t) ∷ [])
   ty ← inferType t
   debugPrint "" 2 (strErr "sep got type " ∷ strErr (showTerm ty) ∷ [])
-  let ret = (def (quote  identity) [ vArg t ]) ⦂ ty
+  let ret = (def (quote  identity) [ vArg t ]) -- ⦂ ty
   return ret
 
-open import Reflection.DeBruijn using (weaken)
+open import Reflection.DeBruijn using (weaken ; strengthen)
 open import Leftovers.Everywhere tcMonad
 
 -- Hack using case-lambda to convince Agda that a term is a definition
@@ -327,7 +328,7 @@ findLeftovers targetSet theMacro goal =
     debugPrint "" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
     --Produce the function that gives the result of the last macro
     let finalResult = (lam visible (abs "holes"
-                    (app (def (quote uncurryₙ) (vArg numHoles ∷ vArg (naryLam numMetas sepBody) ∷ []))
+                    (app (def (quote uncurryₙ) (vArg (Data.Nat.Reflection.toTerm numMetas) ∷ vArg (naryLam numMetas sepBody) ∷ []))
                     (def (quote getHoles) [ vArg (var 0 []) ])
                     )))
     unify goal finalResult
@@ -357,13 +358,52 @@ findLeftovers targetSet theMacro goal =
     quoteSets Vec.[] = con (quote Level.lift) (vArg (quoteTerm tt) ∷ [])
     quoteSets {n = suc n} (x Vec.∷ v) = (con (quote _,_) (vArg x ∷ vArg (quoteSets v) ∷ [] ))
 
+open import Relation.Nullary
+
 -- infixr 10 [_⇒_]
+--
+tsubst : Term → ℕ → Term → TC Term
+tsubst replacement x t = do
+  subbed ← everywhere defaultActions action t
+  let strongSubbed = strengthen subbed
+  case strongSubbed of λ
+    { nothing → typeError (strErr "Bug in subst, failed to replace var " ∷ strErr (NShow.show x) ∷ strErr " in " ∷ termErr t ∷ [])
+    ; (just ret) → return ret}
+  where
+    action : Action Term
+    action Γ t@(var y args) with (Cxt.len Γ + x Nat.≟ y)
+    ... | yes _ = return (foldr (λ argTerm accum → genericApp accum argTerm) replacement args)
+    ... | no _ = return t
+    action _ t = return t
+
+subName : ∀ {ℓ} {X : Set ℓ} -> Name → (X → X) → Term → TC ⊤
+subName {X = X} nm f goal = do
+  XType ← quoteTC X
+  XX ← quoteTC (X → X)
+  fterm ← quoteTC f
+  debugPrint "subName" 2 (strErr "subName input " ∷ termErr fterm ∷ [] )
+  checkType goal XType
+  case fterm of λ
+    {( lam _ (abs _ body)) → do
+      ret ← tsubst (def nm []) 0 body
+      debugPrint "subName" 2 (strErr "subName result " ∷ termErr ret ∷ [] )
+      unify goal (ret ⦂ XType)
+    ; _ → typeError (strErr "Can't replace var in non-lambda term " ∷ termErr fterm ∷ [])
+    }
+  -- ret ← tsubst (def nm []) 0 fterm
+  -- unify goal ret
+
+nameFix : ∀ {ℓ} {X : Set ℓ} → (f : X → X) → (n : Name) -> {@(tactic subName n f) x : X} -> X
+nameFix _ _ {x = x} = x
 
 by : ∀ {ℓ} {A : Set ℓ} {n} {ls} {types : Sets n ls}
   → (theMacro : Term → L.Leftovers ⊤)
   → {@(tactic findLeftovers A theMacro) f : Holes n ls types → A}
-  → Product n types → A
-by {n = n} _ {f} x = f (makeHoles x)
+  → (holes : {A} → Product n types)
+  → (selfName : Name)
+  → {@(tactic subName selfName (λ rec → f (makeHoles (holes {rec})))) x : A}
+  → A
+by _ _ _ {x = x} = x
 
 
 
@@ -379,10 +419,11 @@ open import Relation.Nullary
 
 -- syntax withLeftovers tac x = ► tac ⇒ x ◄
 macro
-  getNormal : ∀ {X : Set} → X → Term → TC ⊤
-  getNormal {X = X} x goal = do
-    t ← quoteTC x
+  getNormal : ∀ {X : Set} → Term → Term → TC ⊤
+  getNormal {X = X} t goal = do
+    -- t ← quoteTC x
     ttype ← quoteTC X
+    checkType t ttype
     checkType goal ttype
     debugPrint "" 2 (strErr "get Normal term " ∷ termErr t ∷ [])
     debugPrint "" 2 (strErr "get Normal term type " ∷ termErr ttype ∷ [])

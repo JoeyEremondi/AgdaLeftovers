@@ -84,7 +84,8 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
                    (clause
                      teles
                      [ vArg (con ctor patArgs) ]
-                     (rhs ⦂ retType))
+                     rhs -- (rhs ⦂ retType)
+                     )
 
                debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
                -- tryUnify rhs (con (quote refl) [])

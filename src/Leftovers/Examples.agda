@@ -17,8 +17,8 @@ open import Data.Unit
 
 
 
--- notNot :  ∀ b → not (not b) ≡ b
--- notNot = (by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) {!!}) -- (refl , refl)
+notNot :  ∀ b → not (not b) ≡ b
+notNot = (by {A = ∀ b → not (not b) ≡ b} (cases (quote Bool)) (refl , refl) (quote notNot)) -- (refl , refl)
 
 -- applyTo : ∀ {ℓ1 ℓ2} {X : Set ℓ1} { Y : Set ℓ2 } → (X → Y) → X → Y
 -- applyTo f x = f x
@@ -27,9 +27,9 @@ open import Data.Unit
 -- syntax applyTo e₁ (λ x → e₂) = x ≔ e₁ ︔ e₂
 
 
-plusZero : ∀ n → n ≡ n + 0
-plusZero =
-   getNormal (by {A = ∀ n → n ≡ n + 0} (cases (quote ℕ)) ((λ x → cong suc (plusZero x)) , refl))
+-- plusZero : ∀ n → n ≡ n + 0
+-- plusZero =
+--    (by {A = ∀ n → n ≡ n + 0} (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl) (quote plusZero))
    -- (by {A = ∀ n → n ≡ n + 0} (cases (quote ℕ)) ((λ x → cong suc (plusZero x)) , refl))
 
 

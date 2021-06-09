@@ -36,9 +36,27 @@ the _ = identity
 _⦂_ : Term → Type → Term
 t ⦂ T = def (quote the) (vArg T ∷ vArg t ∷ [])
 
+happ : Term → Term → Term
+happ f x = def (quote doHapp) (vArg f ∷ hArg x ∷ [])
+  where
+    doHapp : ∀ {ℓ1 ℓ2} {X : Set ℓ1} {Y : Set ℓ2} -> ({X} → Y) → {x : X} → Y
+    doHapp f {x = x} = f {x}
+
+iapp : Term → Term → Term
+iapp f x = def (quote doIapp) (vArg f ∷ hArg x ∷ [])
+  where
+    doIapp : ∀ {ℓ1 ℓ2} {X : Set ℓ1} {Y : Set ℓ2} -> ({{_ : X}} → Y) → {{x : X}} → Y
+    doIapp f {{x}} = f {{x}}
 
 app : Term → Term → Term
 app f x = def (quote _$_) (vArg f ∷ vArg x ∷ [])
+
+genericApp : Term → Arg Term → Term
+genericApp f (arg (arg-info visible m) x) = app f x
+genericApp f (arg (arg-info hidden m) x) = happ f x
+genericApp f (arg (arg-info instance′ m) x) = iapp f x
+
+
 
 returnTypeFor : Type → Term → Leftovers Type
 returnTypeFor (pi (arg _ dom) cod) x = do
