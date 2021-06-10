@@ -13,14 +13,14 @@ open import Data.Nat
 open import Data.Product
 open import Data.Unit
 
-open import Function using (_$_)
+open import Function using (_$_; case_of_) public
 
 import Data.List.Categorical
 open import Level
 open Data.List.Categorical.TraversableM {m = Level.zero} leftoversMonad
 
-case_of_ : ∀ {A B : Set} → A → (A → B) → B
-case x of f = f x
+-- case_of_ : ∀ {A B : Set} → A → (A → B) → B
+-- case x of f = f x
 
 λv_↦_  λh_↦_ : String → Term → Term
 λv x ↦ body  = lam visible (abs x body)

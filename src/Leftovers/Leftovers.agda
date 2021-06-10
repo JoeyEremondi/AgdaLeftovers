@@ -498,6 +498,17 @@ doRun : ∀ {A : Set} → (theMacro : TC Term) → {@(tactic run theMacro) x : A
 doRun _ {x} = x
 
 
+defineBy : ∀ {A : Set }
+  → (selfName : Name)
+  → (theMacro : Term → L.Leftovers ⊤)
+  → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles n types f) : WithHoles A}
+  → (holes : {A} → Product n (toSets types) )
+  → TC ⊤
+defineBy nm _ {(withHoles _ _ f)} holes = do
+  body ← subName nm (λ rec → f (makeHoles (holes {rec})))
+  defineFun nm [ clause [] [] body ]
+  return tt
+
 open import Relation.Nullary
 
 -- syntax withLeftovers tac x = ► tac ⇒ x ◄
