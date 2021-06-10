@@ -1,5 +1,5 @@
 
-{-# OPTIONS -v 2 #-}
+{-# OPTIONS -v 2 --auto-inline #-}
 module Leftovers.Examples where
 
 open import Leftovers.Utils
@@ -15,10 +15,10 @@ open import Data.Product
 open import Data.Unit
 
 
+open import Reflection using (return)
 
-
-notNot :  ∀ b → not (not b) ≡ b
-notNot = (by {A = ∀ b → not (not b) ≡ b} (quote notNot) (cases (quote Bool)) {!!} ) -- (refl , refl)
+-- notNot :  ∀ b → not (not b) ≡ b
+-- notNot = (by {A = ∀ b → not (not b) ≡ b} (quote notNot) (cases (quote Bool)) (refl , refl) ) -- (refl , refl)
 
 -- applyTo : ∀ {ℓ1 ℓ2} {X : Set ℓ1} { Y : Set ℓ2 } → (X → Y) → X → Y
 -- applyTo f x = f x
@@ -29,9 +29,14 @@ notNot = (by {A = ∀ b → not (not b) ≡ b} (quote notNot) (cases (quote Bool
 
 -- plusZero : ∀ n → n ≡ n + 0
 -- plusZero =
---    (by {A = ∀ n → n ≡ n + 0} (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl) (quote plusZero))
+--    (by {A = ∀ n → n ≡ n + 0} (quote plusZero) (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl) )
    -- (by {A = ∀ n → n ≡ n + 0} (cases (quote ℕ)) ((λ x → cong suc (plusZero x)) , refl))
 
+plusZero' : ∀ n → n ≡ n + 0
+plusZero' = doRun {A = ∀ n → n ≡ n + 0} ( return ( quoteTerm λ { zero → the (zero ≡ zero + 0) refl
+                 ; (suc arg0)
+                     → the (suc arg0 ≡ suc arg0 + 0) (cong suc (plusZero' arg0))
+                 }))
 
 
 -- plusZero' : ∀ n → n ≡ n + 0

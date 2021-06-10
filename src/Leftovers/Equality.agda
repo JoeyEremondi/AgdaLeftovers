@@ -51,7 +51,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       let retFun = (pat-lam clauses [])
       normFun ← reduce retFun
       debugPrint "refl-cases" 2 (strErr "reflcases ret non-norm " ∷ termErr retFun ∷ [])
-      unify hole normFun
+      unify hole (normFun ⦂ holeType)
       normHole ← reduce hole
       debugPrint "refl-cases" 2 (strErr "reflCases final " ∷ termErr normHole ∷ [])
     where
