@@ -22,8 +22,7 @@ collectSubgoals : ∀ {goals} → Set → All WithHoles goals → List (List Set
 collectSubgoals target whs = List.map (λ (Goal , (withHoles types fun)) → List.map (λ Hole → {target} → Hole) types) (toList whs)
 
 data Proofs (target : Set) : List Set → Set1 where
-  trivial : Proofs target []
-  exact : ∀ {goal} → goal → Proofs target [ goal ]
+  exact : ∀ {goals} → HList goals → Proofs target goals
   prove : ∀ {goals} →
     (whs : All WithHoles goals) →
     Proofs target (concat (collectSubgoals target whs)) ->
@@ -46,8 +45,7 @@ seqProofs {target} (goal ∷ goals) a ((withHoles types fun) ∷ whs) leftovers
 
 
 runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → HList Bs
-runNonRecursiveList trivial a = []
-runNonRecursiveList (exact x) a = x ∷ []
+runNonRecursiveList (exact x) a = x
 runNonRecursiveList  (prove whs proofs) a
   with results ←  (runNonRecursiveList proofs a)
     = seqProofs _ a whs results
@@ -59,15 +57,10 @@ runNonRecursive proofs a
 
 open import Reflection
 open import Data.Unit
+open import Leftovers.Utils
 
 runIndProof : ∀ {A : Set} → Name → IndProof A → TC ⊤
 runIndProof {A} nm proof = do
-  let
-    recFun : A → A
-    recFun = λ x → runNonRecursive proof x
-  funTerm ← quoteTC recFun
-  case funTerm of λ
-    { (lam _ (abs _ body)) → {!!}
-    ; _ → typeError (strErr "Impossible, lambda didn't turn into lambda: " ∷ termErr funTerm ∷ [])
-    }
+  funTerm ← quoteTC (λ (x : A) → the A (runNonRecursive proof x))
+  defineFun nm (clauses funTerm)
   return tt

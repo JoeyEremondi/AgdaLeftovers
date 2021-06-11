@@ -8,6 +8,9 @@ open import Data.List as List
 open import Leftovers.Monad
 open import Reflection.Term
 open import Reflection.Pattern as P
+open import Reflection.Argument as A
+import Agda.Builtin.Reflection
+open Agda.Builtin.Reflection using (Visibility ; Modality ; Relevance ; Quantity ; modality ; quantity-ω ; relevant)
 -- open import Reflection.TypeChecking.Monad.Instances
 open import Data.Nat
 open import Data.Product
@@ -35,6 +38,21 @@ the _ = identity
 
 _⦂_ : Term → Type → Term
 t ⦂ T = def (quote the) (vArg T ∷ vArg t ∷ [])
+
+extendClause : String → Visibility →  Clause → Clause
+extendClause argNm v (clause tel ps t) =
+  clause ((argNm , arg info unknown) ∷ tel) (arg info (var 0) ∷ ps) t
+  where
+    info = (arg-info v (modality relevant quantity-ω))
+extendClause argNm v (absurd-clause tel ps) = absurd-clause ((argNm , arg info unknown) ∷ tel) (arg info (var 0) ∷ ps)
+  where
+    info = (arg-info v (modality relevant quantity-ω))
+
+clauses : Term → List Clause
+clauses (pat-lam clauses types) = clauses
+clauses (lam vis (abs argNm body))
+  with subClauses ← clauses body = List.map (extendClause argNm vis) subClauses
+clauses t = [ clause [] [] t ]
 
 happ : Term → Term → Term
 happ f x = def (quote doHapp) (vArg f ∷ hArg x ∷ [])

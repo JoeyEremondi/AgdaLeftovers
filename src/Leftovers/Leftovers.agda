@@ -63,10 +63,6 @@ runSpec comp goal = do
   unify t goal
   debugPrint "" 2 (strErr "runSpec generating " ∷ termErr t ∷ [])
 
-specNorm : Term → TC Term
-specNorm t = runSpeculative $ do
-  ret ← normalise t
-  return (ret , false)
 
 lzeros : (n : ℕ) → Levels n
 lzeros zero = Level.lift tt
@@ -148,8 +144,6 @@ sep t = do
   let ret = (def (quote  identity) [ vArg t ]) -- ⦂ ty
   return ret
 
-open import Reflection.DeBruijn using (weaken ; strengthen)
-open import Leftovers.Everywhere tcMonad
 
 
 getMetas : Term → TC (List L.Hole)
@@ -333,36 +327,8 @@ open import Relation.Nullary
 
 -- infixr 10 [_⇒_]
 --
-tsubst : Term → ℕ → Term → TC Term
-tsubst replacement x t = do
-  subbed ← everywhere defaultActions action t
-  let strongSubbed = strengthen subbed
-  case strongSubbed of λ
-    { nothing → typeError (strErr "Bug in subst, failed to replace var " ∷ strErr (NShow.show x) ∷ strErr " in " ∷ termErr t ∷ [])
-    ; (just ret) → return ret}
-  where
-    action : Action Term
-    action Γ t@(var y args) with (Cxt.len Γ + x Nat.≟ y)
-    ... | yes _ = return (foldr (λ argTerm accum → genericApp accum argTerm) replacement args)
-    ... | no _ = return t
-    action _ t = return t
 
 
-subName : ∀ {ℓ} {X : Set ℓ} -> Name → (X → X) → TC Term
-subName {X = X} nm f = do
-  XType ← quoteTC X
-  XX ← quoteTC (X → X)
-  fterm ← quoteTC f
-  debugPrint "subName" 2 (strErr "subName input " ∷ termErr fterm ∷ [] )
-  -- checkType goal XType
-  case fterm of λ
-    {( lam _ (abs _ body)) → do
-      ret ← tsubst (def nm []) 0 body
-      nf ← specNorm (ret ⦂ XType)
-      debugPrint "subName" 2 (strErr "subName result " ∷ termErr nf ∷ [] )
-      return (nf ⦂ XType)
-    ; _ → typeError (strErr "Can't replace var in non-lambda term " ∷ termErr fterm ∷ [])
-    }
 
 by : ∀ {A : Set }
   → (selfName : Name)
