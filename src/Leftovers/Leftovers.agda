@@ -296,14 +296,13 @@ open import Relation.Nullary
 
 open import Data.List.Properties using (++-identityʳ )
 
-byInduction : ∀ {A : Set }
+prove_byInduction_⦊_ : ∀ (A : Set)
   → (theMacro : Term → L.Leftovers ⊤)
   → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles types f) : WithHoles A}
   → (holes : Proofs A (List.map (λ Goal → {A} → Goal) types) )
   -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
   → IndProof A
-byInduction {A = A} theMacro {wh} holes = prove (wh ∷ []) (concatProofs holes)
--- by _ _ _ {x = x} = x
+prove_byInduction_⦊_ A theMacro {wh} holes = chain (wh ∷ []) (concatProofs holes)
 
 doRun : ∀ {A : Set} → (theMacro : TC Term) → {@(tactic run theMacro) x : A} → A
 doRun _ {x} = x

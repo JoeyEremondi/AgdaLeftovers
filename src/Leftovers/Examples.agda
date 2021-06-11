@@ -30,13 +30,20 @@ open import Leftovers.Proofs
 -- syntax applyTo e₁ (λ x → e₂) = x ≔ e₁ ︔ e₂
 
 
-pzProof : IndProof (∀ n → n ≡ n + 0)
-pzProof = byInduction {A = ∀ n → n ≡ n + 0} (cases (quote ℕ))
-      (exact ((λ {self} → λ n → cong suc (self n)) ∷ (refl ∷ [])))
 
 -- This one works and passes the termination checker
 plusZero : ∀ n → n ≡ n + 0
-unquoteDef plusZero = runIndProof plusZero pzProof
+plusZero = helper
+  where
+    proof : IndProof (∀ n → n ≡ n + 0)
+    proof =
+      prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
+      manual (λ {self} → λ n → cong suc (self n)) ⦊
+      manual refl ⦊
+      ∎
+      -- (exact ((λ {self} → λ n → cong suc (self n)) ∷ (refl ∷ [])))
+    helper : ∀ n → n ≡ n + 0
+    unquoteDef helper = runIndProof helper proof
 
 -- plusZero : ∀ n → n ≡ n + 0
 -- unquoteDef plusZero = defineBy {A = ∀ n → n ≡ n + 0} plusZero (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl)

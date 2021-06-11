@@ -46,7 +46,7 @@ collectSubgoals target whs = List.map (λ (Goal , (withHoles types fun)) → Lis
 
 data Proofs (target : Set) : List Set → Set1 where
   exact : ∀ {goals} → HList goals → Proofs target goals
-  prove : ∀ {goals} →
+  chain : ∀ {goals} →
     (whs : All WithHoles goals) →
     Proofs target (concat (collectSubgoals target whs)) ->
     Proofs target goals
@@ -56,6 +56,9 @@ Proof A ⇒ B = Proofs A [ B ]
 
 IndProof : Set → Set1
 IndProof A = Proofs A [ A ]
+
+∎ : ∀ {target} → Proofs target []
+∎ = exact []
 
 seqProofs : ∀ {target} goals → target → (whs : All WithHoles goals) →
   HList (concat (collectSubgoals target whs)) ->
@@ -72,12 +75,15 @@ open import Data.List.Properties using (++-identityʳ )
 concatProofs : ∀ {target goals} → Proofs target goals → Proofs target (goals ++ [])
 concatProofs {goals = goals} p rewrite ++-identityʳ goals = p
 
-manual : ∀ {target goals} → NaryFun goals (Proofs target goals)
-manual {goals = goals} = curryHList {doms = goals} exact
+manual_⦊_ : ∀ {target goal goals} → goal → Proofs target goals → Proofs target (goal ∷ goals)
+manual pgoal ⦊ exact pgoals = exact (pgoal ∷ pgoals)
+manual pgoal ⦊ chain whs proofs = chain ((withHoles [] (λ _ → pgoal )) ∷ whs) proofs
+
+
 
 runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → HList Bs
 runNonRecursiveList (exact x) a = x
-runNonRecursiveList  (prove whs proofs) a
+runNonRecursiveList  (chain whs proofs) a
   with results ←  (runNonRecursiveList proofs a)
     = seqProofs _ a whs results
 
@@ -92,6 +98,7 @@ open import Leftovers.Utils
 
 open import Data.Bool
 open import Data.String as String
+
 
 runIndProof : ∀ {A : Set} → Name → IndProof A → TC ⊤
 runIndProof {A} nm proof = do
