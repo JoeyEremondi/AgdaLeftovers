@@ -24,7 +24,8 @@ open import Data.Unit
 open import Data.Nat as Nat hiding (_⊓_)
 open import Data.Nat.Show as NShow
 open import Data.Product
-open import Data.List as List
+import Data.List as List
+open import Data.List using (List ; [] ; _∷_ ; foldr ; length ; _++_ ; [_])
 import Data.Vec as Vec
 open import Data.Vec using (Vec)
 import Data.Vec.Categorical as VCat
@@ -97,13 +98,13 @@ data Dummy : Set where
 
 
 
-sep : Term → TC Term
-sep t = do
-  debugPrint "" 2 (strErr "Finding sep for " ∷ strErr (showTerm t) ∷ [])
-  ty ← inferType t
-  debugPrint "" 2 (strErr "sep got type " ∷ strErr (showTerm ty) ∷ [])
-  let ret = (def (quote  identity) [ vArg t ]) -- ⦂ ty
-  return ret
+-- sep : Term → TC Term
+-- sep t = do
+--   debugPrint "" 2 (strErr "Finding sep for " ∷ strErr (showTerm t) ∷ [])
+--   ty ← inferType t
+--   debugPrint "" 2 (strErr "sep got type " ∷ strErr (showTerm ty) ∷ [])
+--   let ret = (def (quote  identity) [ vArg t ]) -- ⦂ ty
+--   return ret
 
 
 
@@ -149,7 +150,7 @@ getMetas t = do
 abstractMetaType : ℕ → (L.Hole × Type) → Type
 abstractMetaType numStart (hole , ty) =
   foldr (λ param ty → pi param (abs "arg" ty)) ty
-    (take (length (L.Hole.context hole) - numStart) (L.Hole.context hole))
+    (List.take (length (L.Hole.context hole) - numStart) (L.Hole.context hole))
 
 
 -- Given the size of the current context and a list of new parameter types to add
@@ -201,7 +202,7 @@ getMacroHoles targetType ctx theMacro = runSpeculative $
         let
           indexForMeta m =
             Data.Maybe.map proj₁ $
-              head (filter (λ y → m Meta.≟ L.Hole.holeMeta (proj₂ y)) indexedHoles)
+              List.head (List.filter (λ y → m Meta.≟ L.Hole.holeMeta (proj₂ y)) indexedHoles)
         debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normBody ∷ [])
         return (macroResult normBody _ metaVec types indexForMeta , false) -- ((body , metas , types) , false)
         where
@@ -220,6 +221,12 @@ metaToArg results cxt t@(meta m _) with (MacroResult.indexFor results m)
 ... | nothing = typeError (strErr "Internal Error: unfound meta " ∷ termErr (meta m []) ∷ strErr " when finding Leftover holes" ∷ [])
 metaToArg _ _ t = return t
 
+open import Data.List renaming (_∷_ to cons ; [] to nil)
+
+private
+  consNm : Name
+  consNm = quote cons
+
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → TC Term
 findLeftovers targetSet theMacro =
   do
@@ -237,28 +244,38 @@ findLeftovers targetSet theMacro =
     let
       abstractedTypes = (Vec.map (abstractMetaType startCtxLen)
             (Vec.zip (MacroResult.holes result) (MacroResult.types result)))
+      nil : List Set
+      nil = List.[]
       sets =
-        quoteSets abstractedTypes
+        Vec.foldr
+          (λ _ → Term)
+          (λ h t → con consNm (vArg h ∷ vArg t ∷ []))
+          (quoteTerm nil) abstractedTypes
       numHoles =  (Data.Nat.Reflection.toTerm numMetas)
-    debugPrint "Hello" 2 (strErr "Made sets " ∷ strErr (showTerm sets) ∷ [])
+    debugPrint "Hello" 2 (strErr "Raw sets " ∷ strErr (showTerm sets) ∷ [])
+    checkType sets (quoteTerm (List Set))
+    -- sets ← normalise (rawSets ⦂ (quoteTerm (List Set)))
+
+    -- debugPrint "Hello" 2 (strErr "Made sets " ∷ strErr (showTerm sets) ∷ [])
 
     --This gives us enough information to make a function parameterized over the types of holes
     --We traverse the result of the macro, replacing each meta with a parameter
     --and wrap the hole thing in an n-ary lambda taking parameters of the hole types
     funBody ← everywhere defaultActions (metaToArg result) (MacroResult.body result)
-    sepBody ← inContext (List.map vArg (List.reverse $ Vec.toList abstractedTypes) ++ startContext) $ sep funBody
-    debugPrint "" 2 (strErr "got fun body " ∷ strErr (showTerm sepBody) ∷ [])
-    nflam ← specNorm (naryLam numMetas sepBody ⦂ def (quote NaryFun) (vArg sets ∷ vArg targetType ∷ []))
+    debugPrint "" 2 (strErr "got fun body: " ∷ strErr (showTerm funBody) ∷ [])
+    -- sepBody ← inContext (List.map vArg (List.reverse $ Vec.toList abstractedTypes) ++ startContext) $ sep funBody
+    -- debugPrint "" 2 (strErr "got fun body " ∷ strErr (showTerm sepBody) ∷ [])
+    nflam ← specNorm (naryLam numMetas funBody ⦂ def (quote NaryFun) (vArg sets ∷ vArg targetType ∷ []))
     debugPrint "" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
     --Produce the function that gives the result of the last macro
     let
       finalResult =
-        (def (quote uncurryHList)
+        (def (quote uncurryWithHoles)
           (
-            vArg targetType
-            ∷ vArg (Data.Nat.Reflection.toTerm numMetas)
-            ∷ vArg sets
-            ∷ vArg (naryLam numMetas (sepBody ⦂ targetType)) ∷ []))
+            -- ∷ vArg (Data.Nat.Reflection.toTerm numMetas)
+            vArg sets
+            ∷ vArg targetType
+            ∷ vArg (naryLam numMetas (funBody ⦂ targetType)) ∷ []))
     -- unify goal finalResult
     debugPrint "Hello" 2 (strErr "Final Result " ∷ termErr finalResult ∷ [])
     return finalResult
@@ -267,22 +284,10 @@ findLeftovers targetSet theMacro =
     naryLam 0 x = x
     naryLam (suc n) x = lam visible (abs ("hole" String.++ NShow.show (suc n)) (naryLam n x))
 
-    quoteLevels : ∀ {n} → Vec.Vec Term n → TC Term
-    quoteLevels Vec.[] = return (con (quote Level.lift) (vArg (quoteTerm tt) ∷ []))
-    quoteLevels {n = suc n} (x Vec.∷ v) = do
-      rec ← quoteLevels {n = n} v
-      typeOfType ← inferType x
-      let
-        theLevel = case typeOfType of λ
-          { (sort (set l)) →  l
-          ; (sort (lit l)) →  (def (quote #_) (vArg (lit (nat l)) ∷ [] ))
-          ;  _ → quoteTerm Level.zero }
 
-      return (con (quote _,_) (vArg theLevel ∷ vArg rec ∷ [] ))
-
-    quoteSets : ∀ {n} → Vec.Vec Term n → Term
-    quoteSets Vec.[] = con (quote Level.lift) (vArg (quoteTerm tt) ∷ [])
-    quoteSets {n = suc n} (x Vec.∷ v) = (con (quote _,_) (vArg x ∷ vArg (quoteSets v) ∷ [] ))
+    -- quoteSets : ∀ {n} → Vec.Vec Term n → Term
+    -- quoteSets Vec.[] = con (quote Level.lift) (vArg (quoteTerm tt) ∷ [])
+    -- quoteSets {n = suc n} (x Vec.∷ v) = (con (quote _,_) (vArg x ∷ vArg (quoteSets v) ∷ [] ))
 
 open import Relation.Nullary
 

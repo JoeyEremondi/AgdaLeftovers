@@ -18,6 +18,8 @@ open import Data.List using (_∷_ ; [])
 open import Reflection
 open import Function
 
+open import Leftovers.Proofs
+
 -- notNot :  ∀ b → not (not b) ≡ b
 -- notNot = (by {A = ∀ b → not (not b) ≡ b} (quote notNot) (cases (quote Bool)) (refl , refl) ) -- (refl , refl)
 
@@ -27,33 +29,14 @@ open import Function
 -- infixr 40 applyTo
 -- syntax applyTo e₁ (λ x → e₂) = x ≔ e₁ ︔ e₂
 
+
+pzProof : IndProof (∀ n → n ≡ n + 0)
+pzProof = byInduction {A = ∀ n → n ≡ n + 0} (cases (quote ℕ))
+      (exact ((λ {self} → λ n → cong suc (self n)) ∷ (refl ∷ [])))
+
 -- This one works and passes the termination checker
 plusZero : ∀ n → n ≡ n + 0
-plusZero = λ { zero → refl
-             ; (suc arg0) → cong suc (plusZero arg0)
-             }
-
--- This produces the exact same term as above, but doesn't pass the checker
--- Even though all it's doing is defining the exact same term
-mkDef : Name → TC ⊤
-mkDef nm = do
-  ty ← inferType (def nm [])
-  debugPrint "" 2 (strErr "got ty (" ∷ termErr ty ∷ strErr ") for name " ∷ nameErr nm ∷ [])
-  subbedTerm ← runSpeculative $ do
-    ret ← subName nm (λ (self : ∀ n → n ≡ n + 0) → the (∀ n → n ≡ n + 0) λ
-                     { zero → refl
-                     ; (suc arg0) → (cong suc (self arg0)) })
-    nf ← normalise ret
-    return (nf , false)
-  clauses ← case subbedTerm of λ
-    { (pat-lam clauses types) → return clauses
-    ; _ → typeError (strErr "result was not pat-lam " ∷ termErr subbedTerm ∷ []) }
-  debugPrint "mkDef" 2 (strErr "Subbed term " ∷ termErr subbedTerm ∷ [])
-  defineFun nm clauses
-  return tt
-
-plusZero' : ∀ n → n ≡ n + 0
-unquoteDef plusZero' = mkDef plusZero'
+unquoteDef plusZero = runIndProof plusZero pzProof
 
 -- plusZero : ∀ n → n ≡ n + 0
 -- unquoteDef plusZero = defineBy {A = ∀ n → n ≡ n + 0} plusZero (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl)

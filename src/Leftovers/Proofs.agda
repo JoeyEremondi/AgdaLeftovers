@@ -11,6 +11,8 @@ open import Data.List.Relation.Unary.All using ([] ; _∷_) public
 
 open import Function
 
+open import Leftovers.Subst
+
 HList : List Set → Set1
 HList = All id
 
@@ -18,9 +20,9 @@ NaryFun : ∀ {ℓ} → List Set → Set ℓ → Set ℓ
 NaryFun [] cod = cod
 NaryFun (dom ∷ doms) cod = dom → NaryFun doms cod
 
-uncurryHList : ∀ {ℓ} {doms} {cod : Set ℓ} → NaryFun doms cod → HList doms → cod
-uncurryHList {doms = []} {cod} x [] = x
-uncurryHList {doms = dom ∷ doms} {cod} f (x ∷ xs) = uncurryHList (f x) xs
+uncurryHList : ∀ {ℓ} doms (cod : Set ℓ) → NaryFun doms cod → HList doms → cod
+uncurryHList [] cod x [] = x
+uncurryHList (dom ∷ doms) cod f (x ∷ xs) = uncurryHList doms cod (f x) xs
 
 
 curryHList : ∀ {ℓ} {doms} {cod : Set ℓ} → (HList doms → cod) → NaryFun doms cod
@@ -34,6 +36,10 @@ record WithHoles (A : Set) : Set1 where
     -- numHoles : ℕ
     types : List Set
     holeyFun : HList types → A
+
+
+uncurryWithHoles : ∀ doms cod → NaryFun doms cod → WithHoles cod
+uncurryWithHoles doms cod f = withHoles doms (uncurryHList doms cod f)
 
 collectSubgoals : ∀ {goals} → Set → All WithHoles goals → List (List Set)
 collectSubgoals target whs = List.map (λ (Goal , (withHoles types fun)) → List.map (λ Hole → {target} → Hole) types) (toList whs)
@@ -84,8 +90,16 @@ open import Reflection
 open import Data.Unit
 open import Leftovers.Utils
 
+open import Data.Bool
+open import Data.String as String
+
 runIndProof : ∀ {A : Set} → Name → IndProof A → TC ⊤
 runIndProof {A} nm proof = do
-  funTerm ← quoteTC (λ (x : A) → the A (runNonRecursive proof x))
-  defineFun nm (clauses funTerm)
+  fixpoint ← runSpeculative $ do
+    ret ← subName nm (λ (x) → the A (runNonRecursive proof x))
+    nf ← normalise ret
+    return (nf , false)
+  let cls = clauses fixpoint
+  debugPrint "" 2 (strErr "got clauses" ∷ List.map (λ c → strErr (" " String.++ (showClause c) String.++ " ")) cls)
+  defineFun nm cls
   return tt
