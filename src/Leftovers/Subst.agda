@@ -1,3 +1,4 @@
+{-# OPTIONS --without-K #-}
 module Leftovers.Subst where
 
 open import Reflection
@@ -50,3 +51,5 @@ subName {X = X} nm f = do
       return (nf ⦂ XType)
     ; _ → typeError (strErr "Can't replace var in non-lambda term " ∷ termErr fterm ∷ [])
     }
+
+

@@ -1,15 +1,32 @@
+{-# OPTIONS --without-K #-}
 module Leftovers.Proofs where
 
 open import Data.Nat
 open import Data.List as List
-open import Data.List.Relation.Unary.All as All
+open import Data.List.Relation.Unary.All
+import Data.List.Relation.Unary.All as All
 open import Data.List.Relation.Unary.All.Properties as All
 open import Data.Product
+open import Data.List.Relation.Unary.All using ([] ; _∷_) public
 
 open import Function
 
 HList : List Set → Set1
 HList = All id
+
+NaryFun : ∀ {ℓ} → List Set → Set ℓ → Set ℓ
+NaryFun [] cod = cod
+NaryFun (dom ∷ doms) cod = dom → NaryFun doms cod
+
+uncurryHList : ∀ {ℓ} {doms} {cod : Set ℓ} → NaryFun doms cod → HList doms → cod
+uncurryHList {doms = []} {cod} x [] = x
+uncurryHList {doms = dom ∷ doms} {cod} f (x ∷ xs) = uncurryHList (f x) xs
+
+
+curryHList : ∀ {ℓ} {doms} {cod : Set ℓ} → (HList doms → cod) → NaryFun doms cod
+curryHList {doms = []} {cod} f = f []
+curryHList {doms = dom ∷ doms} {cod} f = λ x → curryHList {doms = doms} λ ds → f (x ∷ ds)
+
 
 record WithHoles (A : Set) : Set1 where
   constructor withHoles
@@ -43,6 +60,14 @@ seqProofs {target} (goal ∷ goals) a ((withHoles types fun) ∷ whs) leftovers
   with fstUnmapped ← All.map⁻ fst
   with fstApplied ← All.map (λ fun → fun {a}) fstUnmapped = fun fstApplied ∷ seqProofs goals a whs (concat⁺ rest)
 
+open import Data.List.Properties using (++-identityʳ )
+
+-- Helper for making proofs for result of concat, which always has ++ [] at the end
+concatProofs : ∀ {target goals} → Proofs target goals → Proofs target (goals ++ [])
+concatProofs {goals = goals} p rewrite ++-identityʳ goals = p
+
+manual : ∀ {target goals} → NaryFun goals (Proofs target goals)
+manual {goals = goals} = curryHList {doms = goals} exact
 
 runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → HList Bs
 runNonRecursiveList (exact x) a = x

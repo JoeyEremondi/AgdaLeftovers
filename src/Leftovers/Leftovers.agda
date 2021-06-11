@@ -16,6 +16,10 @@ open import Reflection.Argument using (unArg)
 
 open import Data.Fin using (toℕ ; Fin)
 
+
+open import Reflection.DeBruijn using (weaken ; strengthen)
+open import Leftovers.Everywhere tcMonad
+
 open import Data.Unit
 open import Data.Nat as Nat hiding (_⊓_)
 open import Data.Nat.Show as NShow
@@ -24,16 +28,15 @@ open import Data.List as List
 import Data.Vec as Vec
 open import Data.Vec using (Vec)
 import Data.Vec.Categorical as VCat
-
+open import Reflection.DeBruijn
 
 import Data.List.Categorical
 open Data.List.Categorical.TraversableM {m = Level.zero} tcMonad
 
 open import Data.Maybe using (just ; nothing)
 
-
-open import Function.Nary.NonDependent
-open import Data.Product.Nary.NonDependent
+-- open import Function.Nary.NonDependent
+-- open import Data.Product.Nary.NonDependent
 
 
 open import Category.Monad.State
@@ -47,6 +50,9 @@ import Data.Nat.Reflection
 
 import Leftovers.Monad as L
 open import Relation.Binary.PropositionalEquality hiding ([_])
+
+open import Leftovers.Subst
+open import Leftovers.Proofs
 
 run : (TC Term) → Term → TC ⊤
 run comp goal = do
@@ -64,51 +70,6 @@ runSpec comp goal = do
   debugPrint "" 2 (strErr "runSpec generating " ∷ termErr t ∷ [])
 
 
-lzeros : (n : ℕ) → Levels n
-lzeros zero = Level.lift tt
-lzeros (suc n) = Level.zero , (lzeros n)
-
-Set0s : (n : ℕ) → Set (Level.suc (⨆ n (lzeros n)))
-Set0s n = Sets n (lzeros n)
-
-
-
-toSets : ∀ {n} → Vec Set n → Sets n (lzeros n)
-toSets {zero} Vec.[] = Level.lift tt
-toSets {suc n} (x Vec.∷ setVec) = x , (toSets setVec)
-
-fromSets : ∀ {n} → Sets n (lzeros n) → Vec Set n
-fromSets {zero} sets = Vec.[]
-fromSets {suc n} (fst , snd) = fst Vec.∷ fromSets snd
-
-toFromSets : ∀ {n} {sets : Sets n (lzeros n)} → toSets (fromSets sets) ≡ sets
-toFromSets {zero} = refl
-toFromSets {suc n} {fst , snd} rewrite toFromSets {n} {snd} = refl
-
-fromToSets : ∀ {n} {sets : Vec Set n } → fromSets (toSets sets) ≡ sets
-fromToSets {zero} {Vec.[]} = refl
-fromToSets {suc n} {x Vec.∷ sets} rewrite fromToSets {n} {sets} = refl
-
-Product0 : (n : ℕ) → Vec Set n → Set
-Product0 zero sets = ⊤
-Product0 (suc n) (x Vec.∷ sets) = x × Product0 n sets
-
-
-
-getHoles : ∀ {n sets} → Product0 n (fromSets sets) → Product n sets
-getHoles {zero} x = tt
-getHoles {suc zero} {fst , snd} ( (fst₁ , snd₁)) = fst₁
-getHoles {suc (suc n)} {fst , snd} ( (fst₁ , snd₁)) = fst₁ , getHoles ( snd₁)
-
-makeHoles : ∀ {n sets} → Product n (toSets sets) → Product0 n sets
-makeHoles {zero} {sets} x = tt
-makeHoles {suc zero} {x₁ Vec.∷ sets} x = x , tt
-makeHoles {suc (suc n)} {x₁ Vec.∷ sets} (fst , snd) = fst , makeHoles snd
-
-
-
-uncurryEx : (A : Set) → (n : ℕ) → (sets : Sets n (lzeros n)) → sets ⇉ A → WithHoles A
-uncurryEx _ n sets fun = withHoles n _ (λ holes → uncurryₙ n fun (getHoles holes))
 
 open import Agda.Builtin.Nat using (_-_)
 
@@ -287,12 +248,12 @@ findLeftovers targetSet theMacro =
     funBody ← everywhere defaultActions (metaToArg result) (MacroResult.body result)
     sepBody ← inContext (List.map vArg (List.reverse $ Vec.toList abstractedTypes) ++ startContext) $ sep funBody
     debugPrint "" 2 (strErr "got fun body " ∷ strErr (showTerm sepBody) ∷ [])
-    nflam ← specNorm (naryLam numMetas sepBody ⦂ def (quote _⇉_) (vArg sets ∷ vArg targetType ∷ []))
+    nflam ← specNorm (naryLam numMetas sepBody ⦂ def (quote NaryFun) (vArg sets ∷ vArg targetType ∷ []))
     debugPrint "" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
     --Produce the function that gives the result of the last macro
     let
       finalResult =
-        (def (quote uncurryEx)
+        (def (quote uncurryHList)
           (
             vArg targetType
             ∷ vArg (Data.Nat.Reflection.toTerm numMetas)
@@ -328,31 +289,31 @@ open import Relation.Nullary
 -- infixr 10 [_⇒_]
 --
 
+open import Data.List.Properties using (++-identityʳ )
 
-
-by : ∀ {A : Set }
-  → (selfName : Name)
+byInduction : ∀ {A : Set }
   → (theMacro : Term → L.Leftovers ⊤)
-  → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles n types f) : WithHoles A}
-  → (holes : {A} → Product n (toSets types) )
-  → {@(tactic runSpec (subName selfName (λ rec → f (makeHoles (holes {rec}))))) x : A}
-  → A
-by _ _ _ {x = x} = x
+  → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles types f) : WithHoles A}
+  → (holes : Proofs A (List.map (λ Goal → {A} → Goal) types) )
+  -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
+  → IndProof A
+byInduction {A = A} theMacro {wh} holes = prove (wh ∷ []) (concatProofs holes)
+-- by _ _ _ {x = x} = x
 
 doRun : ∀ {A : Set} → (theMacro : TC Term) → {@(tactic run theMacro) x : A} → A
 doRun _ {x} = x
 
 
-defineBy : ∀ {A : Set }
-  → (selfName : Name)
-  → (theMacro : Term → L.Leftovers ⊤)
-  → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles n types f) : WithHoles A}
-  → (holes : {A} → Product n (toSets types) )
-  → TC ⊤
-defineBy nm _ {(withHoles _ _ f)} holes = do
-  body ← subName nm (λ rec → f (makeHoles (holes {rec})))
-  defineFun nm [ clause [] [] body ]
-  return tt
+-- defineBy : ∀ {A : Set }
+--   → (selfName : Name)
+--   → (theMacro : Term → L.Leftovers ⊤)
+--   → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles n types f) : WithHoles A}
+--   → (holes : {A} → Product n (toSets types) )
+--   → TC ⊤
+-- defineBy nm _ {(withHoles _ _ f)} holes = do
+--   body ← subName nm (λ rec → f (makeHoles (holes {rec})))
+--   defineFun nm [ clause [] [] body ]
+--   return tt
 
 open import Relation.Nullary
 
