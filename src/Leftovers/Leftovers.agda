@@ -25,6 +25,7 @@ open import Data.Nat as Nat hiding (_⊓_)
 open import Data.Nat.Show as NShow
 open import Data.Product
 import Data.List as List
+import Data.List.Properties as List
 import Data.List.Relation.Unary.All as All
 import Data.List.Relation.Unary.All.Properties as All
 open import Data.List using (List ; [] ; _∷_ ; foldr ; length ; _++_ ; [_])
@@ -299,20 +300,20 @@ open import Relation.Nullary
 open import Data.List.Properties using (++-identityʳ )
 
 prove_byInduction_⦊_ : ∀ (A : Set)
-  → (theMacro : Term → L.Leftovers ⊤)
+  → (@0 theMacro : Term → L.Leftovers ⊤)
   → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles types f) : WithHoles A}
   → (holes : Proofs A (List.map (λ Goal → {A} → Goal) types) )
   -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
   → IndProof A
-prove_byInduction_⦊_ A theMacro {wh} holes = chain (wh ∷ []) (concatProofs holes)
+prove_byInduction_⦊_ A theMacro {wh} holes = pcons wh (subst (Proofs A) (sym (List.++-identityʳ _ )) holes) --  (wh ∷ []) (concatProofs holes)
 
-by_⦊_ : ∀ {target goal : Set} {goals : List Set} →
-  (theMacro : Term → L.Leftovers ⊤) →
-  {@(tactic runSpec (findLeftovers goal theMacro)) (withHoles types f) : WithHoles goal}
-  → Proofs target (types ++ goals)
-  → Proofs target (goal ∷ goals)
-by_⦊_ {target = target} _ {wh} holes
-  with (newHoles , oldHoles) ← All.++⁻ (WithHoles.types wh) (getHoles holes) = chain (wh ∷ oldHoles) {!!}
+by_⦊_ : ∀ {IndHyp goal : Set} {goals : List Set} →
+  (@0 theMacro : Term → L.Leftovers ⊤) →
+  {@(tactic runSpec (findLeftovers goal theMacro)) wh : WithHoles goal}
+  → Proofs IndHyp (subGoalsForWH IndHyp wh ++ goals)
+  → Proofs IndHyp (goal ∷ goals)
+by_⦊_  _ {wh} holes
+  = pcons wh holes
 
 doRun : ∀ {A : Set} → (theMacro : TC Term) → {@(tactic run theMacro) x : A} → A
 doRun _ {x} = x

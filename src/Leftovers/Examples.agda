@@ -38,10 +38,8 @@ plusZero = helper
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
-      manual (λ {self} → λ n → cong suc (self n)) ⦊
-      manual refl ⦊
-      ∎
-      -- (exact ((λ {self} → λ n → cong suc (self n)) ∷ (refl ∷ [])))
+      (nextBy manual (λ {self} x → cong suc (self x)) ⦊
+      (nextBy manual refl ⦊ ∎ ))
     helper : ∀ n → n ≡ n + 0
     unquoteDef helper = runIndProof helper proof
 
