@@ -25,6 +25,8 @@ open import Data.Nat as Nat hiding (_⊓_)
 open import Data.Nat.Show as NShow
 open import Data.Product
 import Data.List as List
+import Data.List.Relation.Unary.All as All
+import Data.List.Relation.Unary.All.Properties as All
 open import Data.List using (List ; [] ; _∷_ ; foldr ; length ; _++_ ; [_])
 import Data.Vec as Vec
 open import Data.Vec using (Vec)
@@ -303,6 +305,14 @@ prove_byInduction_⦊_ : ∀ (A : Set)
   -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
   → IndProof A
 prove_byInduction_⦊_ A theMacro {wh} holes = chain (wh ∷ []) (concatProofs holes)
+
+by_⦊_ : ∀ {target goal : Set} {goals : List Set} →
+  (theMacro : Term → L.Leftovers ⊤) →
+  {@(tactic runSpec (findLeftovers goal theMacro)) (withHoles types f) : WithHoles goal}
+  → Proofs target (types ++ goals)
+  → Proofs target (goal ∷ goals)
+by_⦊_ {target = target} _ {wh} holes
+  with (newHoles , oldHoles) ← All.++⁻ (WithHoles.types wh) (getHoles holes) = chain (wh ∷ oldHoles) {!!}
 
 doRun : ∀ {A : Set} → (theMacro : TC Term) → {@(tactic run theMacro) x : A} → A
 doRun _ {x} = x
