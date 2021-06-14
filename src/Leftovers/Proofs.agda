@@ -30,23 +30,39 @@ curryHList : ∀ {ℓ} {doms} {cod : Set ℓ} → (HList doms → cod) → NaryF
 curryHList {doms = []} {cod} f = f []
 curryHList {doms = dom ∷ doms} {cod} f = λ x → curryHList {doms = doms} λ ds → f (x ∷ ds)
 
+open import Data.String as String using (String)
+
+LSet : Set1
+LSet = List String × Set
+
+unLabel : LSet → Set
+unLabel = proj₂
+
+dummyLabel : Set → LSet
+dummyLabel X = ([] , X)
+
+dummyLabels : List Set → List LSet
+dummyLabels = List.map dummyLabel
 
 record WithHoles (A : Set) : Set1 where
   constructor withHoles
   field
     -- numHoles : ℕ
-    types : List Set
+    labeledTypes : List LSet
+  types : List Set
+  types = List.map unLabel labeledTypes
+  field
     holeyFun : HList types → A
 
 
-uncurryWithHoles : ∀ doms cod → NaryFun doms cod → WithHoles cod
-uncurryWithHoles doms cod f = withHoles doms (uncurryHList doms cod f)
+uncurryWithHoles : ∀ (doms : List (List String × Set)) cod → NaryFun (List.map unLabel doms) cod → WithHoles cod
+uncurryWithHoles doms cod f =  withHoles doms (uncurryHList (List.map unLabel doms) cod f)
 
 holdsUnderIndHyp : Set → Set → Set
 holdsUnderIndHyp IndHyp Goal = {indHyp : IndHyp} → Goal
 
 subGoalsForWH : ∀ IndHyp { goal} → WithHoles goal → List Set
-subGoalsForWH IndHyp (withHoles types fun) = List.map (holdsUnderIndHyp IndHyp) types
+subGoalsForWH IndHyp wh = List.map (holdsUnderIndHyp IndHyp) (WithHoles.types wh)
 
 open import Relation.Unary
 
@@ -152,13 +168,13 @@ unconcatProof {IndHyp = IndHyp} {goals1 = x ∷ goals1} {goals2 = goals2} (pcons
 
 runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → HList Bs
 runNonRecursiveList {A} {.[]} ∎ a = []
-runNonRecursiveList {A} {(goal ∷ goals)} (pcons (withHoles types fun) proofs) a
-  = fun (applyIndHypAll a (map⁻ (proj₁ recLR))) ∷ proj₂ recLR
+runNonRecursiveList {A} {(goal ∷ goals)} (pcons wh proofs) a
+  = WithHoles.holeyFun wh (applyIndHypAll a (map⁻ (proj₁ recLR))) ∷ proj₂ recLR
     where
-      rec : HList (subGoalsForWH A (withHoles types fun) ++ goals)
+      rec : HList (subGoalsForWH A wh ++ goals)
       rec = runNonRecursiveList proofs a
-      recLR : HList (subGoalsForWH A (withHoles types fun)) × HList goals
-      recLR = ++⁻ (subGoalsForWH A (withHoles types fun)) rec
+      recLR : HList (subGoalsForWH A wh) × HList goals
+      recLR = ++⁻ (subGoalsForWH A wh) rec
 
 
 runNonRecursive : ∀ {A B} → Proof A ⇒ B → A → B

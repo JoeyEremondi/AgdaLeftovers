@@ -276,7 +276,7 @@ findLeftovers targetSet theMacro =
         (def (quote uncurryWithHoles)
           (
             -- ∷ vArg (Data.Nat.Reflection.toTerm numMetas)
-            vArg sets
+            vArg (def (quote dummyLabels) [ vArg sets ])
             ∷ vArg targetType
             ∷ vArg (naryLam numMetas (funBody ⦂ targetType)) ∷ []))
     -- unify goal finalResult
@@ -301,8 +301,8 @@ open import Data.List.Properties using (++-identityʳ )
 
 prove_byInduction_⦊_ : ∀ (A : Set)
   → (@0 theMacro : Term → L.Leftovers ⊤)
-  → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles types f) : WithHoles A}
-  → (holes : Proofs A (List.map (λ Goal → {A} → Goal) types) )
+  → {@(tactic runSpec (findLeftovers A theMacro)) wh : WithHoles A}
+  → (holes : Proofs A (List.map (λ Goal → {A} → Goal) (WithHoles.types wh)) )
   -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
   → IndProof A
 prove_byInduction_⦊_ A theMacro {wh} holes = pcons wh (subst (Proofs A) (sym (List.++-identityʳ _ )) holes) --  (wh ∷ []) (concatProofs holes)
