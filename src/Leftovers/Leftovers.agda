@@ -3,7 +3,7 @@ module Leftovers.Leftovers where
 
 open import Function using (_$_)
 open import Data.Bool
-import Data.String as String
+open import Data.String as String using (String)
 
 open import Leftovers.TraverseTerm
 open import Leftovers.Utils
@@ -18,7 +18,11 @@ open import Data.Fin using (toℕ ; Fin)
 
 
 open import Reflection.DeBruijn using (weaken ; strengthen)
-open import Leftovers.Everywhere tcMonad
+import Leftovers.Everywhere
+import Category.Monad.State as State
+
+open Leftovers.Everywhere tcMonad
+-- open import SE tcMonad -- renaming (everywhere to Severywhere ; Cxt to SCxt ; defaultActions to SdefaultActions)
 
 open import Data.Unit
 open import Data.Nat as Nat hiding (_⊓_)
@@ -43,7 +47,6 @@ open import Data.Maybe using (just ; nothing)
 -- open import Data.Product.Nary.NonDependent
 
 
-open import Category.Monad.State
 import Category.Monad as Monad
 
 
@@ -57,6 +60,8 @@ open import Relation.Binary.PropositionalEquality hiding ([_])
 
 open import Leftovers.Subst
 open import Leftovers.Proofs
+
+
 
 run : (TC Term) → Term → TC ⊤
 run comp goal = do
@@ -130,6 +135,8 @@ getMetas t = do
                         ; onDef = λ _ _ → nothing }) t
               )
     return (List.deduplicate L.equivDec metaList)
+
+
 
 -- Given the size of the starting context, a hole,
 -- and the list of parameters to add to the start context,
@@ -230,6 +237,8 @@ private
   consNm : Name
   consNm = quote cons
 
+open import Leftovers.LabelMetas
+
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → TC Term
 findLeftovers targetSet theMacro =
   do
@@ -271,12 +280,20 @@ findLeftovers targetSet theMacro =
     nflam ← specNorm (naryLam numMetas funBody ⦂ def (quote NaryFun) (vArg sets ∷ vArg targetType ∷ []))
     debugPrint "" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
     --Produce the function that gives the result of the last macro
+    labelPairs ← labelMetas funBody
+    let labels = Vec.map (λ x → labelFor (L.Hole.holeMeta x) labelPairs) (MacroResult.holes result)
+        termLabels = 
+          Vec.foldr
+            (λ _ → Term)
+            (λ h t → con consNm (vArg (lit (string h)) ∷ vArg t ∷ []))
+            (quoteTerm nil) labels
+    normSets ← normalise ((def (quote List.zip) (vArg termLabels ∷ vArg sets ∷ [])))
     let
       finalResult =
         (def (quote uncurryWithHoles)
           (
             -- ∷ vArg (Data.Nat.Reflection.toTerm numMetas)
-            vArg (def (quote dummyLabels) [ vArg sets ])
+            vArg normSets
             ∷ vArg targetType
             ∷ vArg (naryLam numMetas (funBody ⦂ targetType)) ∷ []))
     -- unify goal finalResult

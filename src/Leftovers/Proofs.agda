@@ -33,16 +33,16 @@ curryHList {doms = dom ∷ doms} {cod} f = λ x → curryHList {doms = doms} λ 
 open import Data.String as String using (String)
 
 LSet : Set1
-LSet = List String × Set
+LSet = String × Set
 
 unLabel : LSet → Set
 unLabel = proj₂
 
-dummyLabel : Set → LSet
-dummyLabel X = ([] , X)
+-- dummyLabel : Set → LSet
+-- dummyLabel X = ("" , X)
 
-dummyLabels : List Set → List LSet
-dummyLabels = List.map dummyLabel
+-- dummyLabels : List Set → List LSet
+-- dummyLabels = List.map dummyLabel
 
 record WithHoles (A : Set) : Set1 where
   constructor withHoles
@@ -55,7 +55,7 @@ record WithHoles (A : Set) : Set1 where
     holeyFun : HList types → A
 
 
-uncurryWithHoles : ∀ (doms : List (List String × Set)) cod → NaryFun (List.map unLabel doms) cod → WithHoles cod
+uncurryWithHoles : ∀ (doms : List LSet) cod → NaryFun (List.map unLabel doms) cod → WithHoles cod
 uncurryWithHoles doms cod f =  withHoles doms (uncurryHList (List.map unLabel doms) cod f)
 
 holdsUnderIndHyp : Set → Set → Set

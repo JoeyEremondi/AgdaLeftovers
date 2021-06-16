@@ -37,11 +37,11 @@ plusZero = helper
   where
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
-      prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
-      (nextBy manual (λ {self} x → cong suc (self x)) ⦊
-      (nextBy manual refl ⦊ ∎ ))
+      prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊ {!!}
+      -- (nextBy manual (λ {self} x → cong suc (self x)) ⦊
+      -- (nextBy manual refl ⦊ ∎ ))
     helper : ∀ n → n ≡ n + 0
-    unquoteDef helper = runIndProof helper proof
+    -- unquoteDef helper = runIndProof helper proof
 
 -- plusZero : ∀ n → n ≡ n + 0
 -- unquoteDef plusZero = defineBy {A = ∀ n → n ≡ n + 0} plusZero (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl)

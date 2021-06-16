@@ -4,7 +4,7 @@
 -- de Bruijn-aware generic traversal of reflected terms.
 ------------------------------------------------------------------------
 
-{-# OPTIONS --without-K --safe #-}
+{-# OPTIONS --without-K --safe --auto-inline #-}
 
 open import Category.Applicative using (RawApplicative)
 open import Category.Monad using (RawMonad)
@@ -16,9 +16,10 @@ open import Data.List    using (List; []; _∷_; _++_; reverse; length)
 open import Data.Product using (_×_; _,_)
 open import Data.String  using (String)
 open import Function     using (_∘_)
-open import Reflection
+open import Reflection hiding (_>>_ ; _>>=_ ; return)
 
 open RawMonad MF
+open import Data.Unit
 
 ------------------------------------------------------------------------
 -- Context representation
@@ -59,18 +60,35 @@ defaultActions .Actions.onMeta _ = pure
 defaultActions .Actions.onCon  _ = pure
 defaultActions .Actions.onDef  _ = pure
 
+data BeforeAfter : Set where
+  Before After : BeforeAfter
+
+data Cursor : Set where
+   CTerm : Term → Cursor
+   CClause : Clause → Cursor
+   CArg : ℕ → Arg Term → Cursor
+
 ------------------------------------------------------------------------
 -- Traversal functions
 private
- module Params (actions : Actions) (everyAction : Action Term) where
+
+ module Params (actions : Actions) (beforeAfter : Cxt → BeforeAfter → Cursor → F ⊤)  (everyAction : Action Term) where
 
   open Actions actions
+
+  doBeforeAfter : ∀ {A} → Action A → (A → Cursor) → Action A
+  doBeforeAfter action toCursor Γ x = do
+    beforeAfter  Γ Before (toCursor x)
+    newVal ← action Γ x
+    beforeAfter Γ After (toCursor newVal)
+    return newVal
 
   everywhereTerm    : Action Term
   everywhereTerm'    : Action Term
   everywhereSort    : Action Sort
   everywherePattern : Action Pattern
   everywhereArgs    : Action (List (Arg Term))
+  everywhereArgs'   : ℕ → Action (List (Arg Term))
   everywhereArg     : Action (Arg Term)
   everywherePats    : Action (List (Arg Pattern))
   everywhereAbs     : Arg Term → Action (Abs Term)
@@ -78,7 +96,16 @@ private
   everywhereClause  : Action Clause
   everywhereTel     : Action (List (String × Arg Term))
 
-  everywhereTerm Γ t = everyAction Γ =<< everywhereTerm' Γ t
+
+
+
+  everywhereTerm Γ t = do
+    beforeAfter Γ Before (CTerm t)
+    newTerm ← everywhereTerm' Γ t
+    beforeAfter Γ After (CTerm newTerm)
+    everyAction Γ newTerm
+    -- everyAction Γ =<<
+    -- everywhereTerm' Γ t
 
   everywhereTerm' Γ (var x args)      = var       <$> onVar Γ x ⊛ everywhereArgs Γ args
   everywhereTerm' Γ (con c args)      = con       <$> onCon Γ c ⊛ everywhereArgs Γ args
@@ -94,18 +121,26 @@ private
     m = defaultModality
 
   everywhereArg Γ (arg i t) = arg i <$> everywhereTerm Γ t
-  everywhereArgs Γ []       = pure []
-  everywhereArgs Γ (a ∷ as) = _∷_ <$> everywhereArg Γ a ⊛ everywhereArgs Γ as
-
+  everywhereArgs = everywhereArgs' 0
+  everywhereArgs' i Γ []       = pure []
+  everywhereArgs' i Γ (a ∷ as) = do
+    beforeAfter Γ Before (CArg i a)
+    ret ← _∷_ <$> everywhereArg Γ a ⊛ everywhereArgs' (i + 1) Γ as
+    beforeAfter Γ After (CArg i a)
+    return ret
   everywhereAbs ty Γ (abs x t) = abs x <$> everywhereTerm ((x , ty) ∷cxt Γ) t
 
   everywhereClauses Γ []       = pure []
   everywhereClauses Γ (c ∷ cs) = _∷_ <$> everywhereClause Γ c ⊛ everywhereClauses Γ cs
 
-  everywhereClause Γ (Clause.clause tel ps t) =
-      Clause.clause <$> everywhereTel Γ tel
-                     ⊛  everywherePats Γ′ ps
-                     ⊛ everywhereTerm Γ′ t
+  everywhereClause Γ (Clause.clause tel ps t) = do
+      beforeAfter Γ Before (CClause (Clause.clause tel ps t))
+      ret ←
+        Clause.clause <$> everywhereTel Γ tel
+          ⊛  everywherePats Γ′ ps
+          ⊛ everywhereTerm Γ′ t
+      beforeAfter Γ After (CClause ret)
+      return ret
     where Γ′ = reverse tel ++cxt Γ
   everywhereClause Γ (Clause.absurd-clause tel ps) =
       Clause.absurd-clause <$> everywhereTel Γ tel
@@ -134,4 +169,9 @@ private
   everywherePats Γ (arg i p ∷ ps) = _∷_ ∘ arg i <$> everywherePattern Γ p ⊛ everywherePats Γ ps
 
 everywhere : (actions : Actions) → (everyAction : Action Term) → Term → F Term
-everywhere actions every = Params.everywhereTerm actions every (0 ,, [])
+everywhere actions every = Params.everywhereTerm actions (λ _ _ _ → return tt) every (0 ,, [])
+
+
+contextualEverywhere : (actions : Actions)  → ∀ (beforeAfter : Cxt → BeforeAfter → Cursor → F ⊤ ) → (everyAction : Action Term) → Term → F Term
+contextualEverywhere actions beforeAfter every =
+  Params.everywhereTerm actions beforeAfter every (0 ,, [])
