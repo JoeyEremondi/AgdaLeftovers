@@ -280,7 +280,7 @@ findLeftovers targetSet theMacro =
     nflam ← specNorm (naryLam numMetas funBody ⦂ def (quote NaryFun) (vArg sets ∷ vArg targetType ∷ []))
     debugPrint "" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
     --Produce the function that gives the result of the last macro
-    labelPairs ← labelMetas funBody
+    labelPairs ← labelMetas (MacroResult.body result)
     let labels = Vec.map (λ x → labelFor (L.Hole.holeMeta x) labelPairs) (MacroResult.holes result)
         termLabels = 
           Vec.foldr

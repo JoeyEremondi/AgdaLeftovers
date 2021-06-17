@@ -76,12 +76,6 @@ private
 
   open Actions actions
 
-  doBeforeAfter : ∀ {A} → Action A → (A → Cursor) → Action A
-  doBeforeAfter action toCursor Γ x = do
-    beforeAfter  Γ Before (toCursor x)
-    newVal ← action Γ x
-    beforeAfter Γ After (toCursor newVal)
-    return newVal
 
   everywhereTerm    : Action Term
   everywhereTerm'    : Action Term
