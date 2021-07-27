@@ -25,9 +25,9 @@ record LSet : Set1 where
     theLabel : Label
     unLabel : Set
 
-open LSet
+open LSet public
 
-pattern _⦂_ l X = LS (label l) X
+pattern _⦂⦂_ l X = LS (label l) X
 
 unLabels : List LSet -> List Set
 unLabels = List.map unLabel
@@ -136,10 +136,10 @@ manual x = withHoles [] λ _ → x
 
 
 Proof_⇒_ : Set → Set → Set1
-Proof A ⇒ B = Proofs A [ "Goal" ⦂ B ]
+Proof A ⇒ B = Proofs A [ "Goal" ⦂⦂ B ]
 
 IndProof : Set → Set1
-IndProof A = Proofs A [ "Goal" ⦂ A ]
+IndProof A = Proofs A [ "Goal" ⦂⦂ A ]
 
 open import Data.List.Properties
 

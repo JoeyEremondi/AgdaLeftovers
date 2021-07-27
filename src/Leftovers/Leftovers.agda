@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K #-}
+{-# OPTIONS --without-K --prop #-}
 module Leftovers.Leftovers where
 
 open import Function using (_$_)
@@ -319,14 +319,14 @@ open import Data.List.Properties using (++-identityʳ )
 prove_byInduction_⦊_ : ∀ (A : Set)
   → (@0 theMacro : Term → L.Leftovers ⊤)
   → {@(tactic runSpec (findLeftovers A theMacro)) wh : WithHoles A}
-  → (holes : Proofs A (List.map (λ Goal → {A} → Goal) (WithHoles.types wh)) )
+  → (holes : Proofs A (List.map (λ Goal → LS (theLabel Goal) ({A} → unLabel Goal) ) (WithHoles.labeledTypes wh)) )
   -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
   → IndProof A
 prove_byInduction_⦊_ A theMacro {wh} holes = pcons wh (subst (Proofs A) (sym (List.++-identityʳ _ )) holes) --  (wh ∷ []) (concatProofs holes)
 
-by_⦊_ : ∀ {IndHyp goal : Set} {goals : List Set} →
+by_⦊_ : ∀ {IndHyp : Set} {goal : LSet} {goals : List LSet} →
   (@0 theMacro : Term → L.Leftovers ⊤) →
-  {@(tactic runSpec (findLeftovers goal theMacro)) wh : WithHoles goal}
+  {@(tactic runSpec (findLeftovers (unLabel goal) theMacro)) wh : WithHoles (unLabel goal)}
   → Proofs IndHyp (subGoalsForWH IndHyp wh ++ goals)
   → Proofs IndHyp (goal ∷ goals)
 by_⦊_  _ {wh} holes
