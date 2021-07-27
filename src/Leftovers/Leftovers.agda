@@ -287,7 +287,7 @@ findLeftovers targetSet theMacro =
             (λ _ → Term)
             (λ h t → con consNm (vArg (lit (string h)) ∷ vArg t ∷ []))
             (quoteTerm nil) labels
-    normSets ← normalise ((def (quote List.zip) (vArg termLabels ∷ vArg sets ∷ [])))
+    normSets ← normalise ((def (quote List.zipWith) (vArg (quoteTerm _⦂⦂_) ∷ vArg termLabels ∷ vArg sets ∷ [])))
     let
       finalResult =
         (def (quote uncurryWithHoles)
