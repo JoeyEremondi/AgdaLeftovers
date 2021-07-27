@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K --auto-inline --prop #-}
+{-# OPTIONS --without-K --auto-inline #-}
 module Leftovers.Proofs where
 
 open import Data.Nat
@@ -16,18 +16,17 @@ open import Relation.Binary.PropositionalEquality hiding ([_])
 
 open import Data.String as String using (String)
 
-data Label : Prop where
-  label : String → Label
+-- data Label : Set where
+--   label : String → Label
 
 record LSet : Set1 where
-  constructor LS
+  constructor _⦂⦂_
   field
-    theLabel : Label
+    theLabel : String
     unLabel : Set
 
 open LSet public
 
-pattern _⦂⦂_ l X = LS (label l) X
 
 unLabels : List LSet -> List Set
 unLabels = List.map unLabel
@@ -80,7 +79,7 @@ uncurryWithHoles : ∀ (doms : List LSet) cod → NaryFun (unLabels doms) cod �
 uncurryWithHoles doms cod f =  withHoles doms (uncurryHList (unLabels doms) cod f)
 
 holdsUnderIndHypLS : Set → LSet → LSet
-holdsUnderIndHypLS IndHyp Goal = LS (theLabel Goal) ({indHyp : IndHyp} → unLabel Goal)
+holdsUnderIndHypLS IndHyp (label ⦂⦂ Goal) = label ⦂⦂ ({indHyp : IndHyp} → Goal)
 
 
 holdsUnderIndHyp : Set → LSet → Set

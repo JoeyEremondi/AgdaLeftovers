@@ -1,5 +1,5 @@
 
-{-# OPTIONS -v 2 --auto-inline --prop #-}
+{-# OPTIONS -v 2 --auto-inline #-}
 module Leftovers.Examples where
 
 open import Leftovers.Utils
