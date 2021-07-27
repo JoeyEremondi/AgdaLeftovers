@@ -1,24 +1,39 @@
-{-# OPTIONS -v 2 #-}
+{-# OPTIONS -v 2 --prop #-}
 module Leftovers.Junk where
 
-open import Data.Bool
-open import Relation.Binary.PropositionalEquality
+
+open import Reflection
+open import Reflection.Term
+open import Reflection.TypeChecking.Monad.Instances
+open import Reflection.Argument using (unArg)
+
+open import Data.Unit
+
+open import Data.String
+open import Data.List
+open import Data.Nat
+
+data SString : Prop where
+  squash : String → SString
+
+data SSString : Set where
+  unsquash : SString → SSString
+
+data Foo : Set where
+  Bar : SString → Foo
 
 
+myMacro : SString → Term → TC ⊤
+myMacro t ret = do
+  tterm ← quoteTC (unsquash t)
+  debugPrint "Leftovers" 2 (strErr "Squashed string " ∷ termErr tterm ∷ [])
+  unify ret (lit (nat 0))
 
-id : ∀ {X : Set} → X → X
-id x = x
+myFun : (s : SString) -> {@(tactic myMacro s) x : ℕ} -> ℕ
+myFun _ {x} = x
 
-the : ∀ X → X → X
-the X = id {X}
+foo : ℕ
+foo = myFun (squash "foo1")
 
-badEq :
-  let f = the (Bool -> Bool -> Bool) (λ x → λ {true → false ; false → true})
-  in f true ≡ f false
-badEq = {!!} -- refl does not typecheck
-
-
-goodEq :
-  let f = the (Bool -> Bool -> Bool) (λ x → id λ {true → false ; false → true})
-  in f true ≡ f false
-goodEq = {!!}
+bar : ℕ
+bar = myFun (squash "bar2")
