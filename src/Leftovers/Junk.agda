@@ -23,6 +23,9 @@ data Foo : Set where
   Bar : SString → Foo
 
 
+xx┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅yy : ℕ
+-- xx yy = 0
+
 myMacro : SString → Term → TC ⊤
 myMacro t ret = do
   tterm ← quoteTC (unsquash t)
