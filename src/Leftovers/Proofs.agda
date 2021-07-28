@@ -95,12 +95,9 @@ subGoalsForWH IndHyp wh = List.map (holdsUnderIndHypLS IndHyp) (WithHoles.labele
 
 open import Relation.Unary
 
-applyIndHyp : ∀ {IndHyp} → IndHyp → (holdsUnderIndHyp IndHyp) ⊆ unLabel
-applyIndHyp hyp fun = fun {hyp}
-
 
 applyIndHypAll : ∀ {IndHyp types} → IndHyp → All (holdsUnderIndHyp IndHyp) types → LHList types
-applyIndHypAll hyp allUnder = All.map (applyIndHyp hyp ) (map⁺ allUnder)
+applyIndHypAll hyp allUnder = All.map (λ {x} fun → fun {hyp}) (map⁺ allUnder)
 
 -- collectSubgoals : ∀ {goal} → Set → All WithHoles goal → List Set
 -- collectSubgoals IndHyp whs = List.map {!!} (toList whs)
