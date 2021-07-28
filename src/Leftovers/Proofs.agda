@@ -9,6 +9,8 @@ open import Data.List.Relation.Unary.All.Properties as All
 open import Data.Product
 open import Data.List.Relation.Unary.All using ([] ; _∷_) public
 
+import Data.List.Properties as LProp
+
 open import Function
 
 open import Leftovers.Subst
@@ -30,6 +32,9 @@ open LSet public
 
 unLabels : List LSet -> List Set
 unLabels = List.map unLabel
+
+unLabels++ : ∀ l1 l2 → unLabels (l1 ++ l2) ≡ unLabels l1 ++ unLabels l2
+unLabels++ l1 l2 = LProp.map-++-commute unLabel l1 l2
 
 HList : List Set → Set1
 HList = All id
@@ -94,8 +99,8 @@ applyIndHyp : ∀ {IndHyp} → IndHyp → (holdsUnderIndHyp IndHyp) ⊆ unLabel
 applyIndHyp hyp fun = fun {hyp}
 
 
--- applyIndHypAll : ∀ {IndHyp types} → IndHyp → All (holdsUnderIndHyp IndHyp) types → LHList types
--- applyIndHypAll hyp = {!All.map !} -- All.map (applyIndHyp hyp)
+applyIndHypAll : ∀ {IndHyp types} → IndHyp → All (holdsUnderIndHyp IndHyp) types → LHList types
+applyIndHypAll hyp allUnder = All.map (applyIndHyp hyp ) (map⁺ allUnder)
 
 -- collectSubgoals : ∀ {goal} → Set → All WithHoles goal → List Set
 -- collectSubgoals IndHyp whs = List.map {!!} (toList whs)
@@ -195,21 +200,28 @@ unconcatProof {IndHyp = IndHyp} {goals1 = x ∷ goals1} {goals2} (pcons wh proof
 -- proof++ {goals1 = []} p1 p2 = p2
 -- proof++ {IndHyp = IndHyp} {goals1 = x ∷ goals1} p1 p2 = subst (Proofs IndHyp) {!!} (proofCons {!!} {!!})
 
--- runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → LHList Bs
--- runNonRecursiveList {A} {.[]} ∎ a = []
--- runNonRecursiveList {A} {(goal ∷ goals)} (pcons wh proofs) a
---   = WithHoles.holeyFun wh (applyIndHypAll a (map⁻ {f = λ Goal → LS _ ({indHyp : A} → unLabel Goal)} {!proj₁ recLR!})) ∷ proj₂ recLR
---   -- = WithHoles.holeyFun wh (applyIndHypAll a (map⁻ (proj₁ recLR))) ∷ proj₂ recLR
---     where
---       rec : LHList (subGoalsForWH A wh ++ goals)
---       rec with ret <- runNonRecursiveList proofs a = runNonRecursiveList proofs a -- runNonRecursiveList proofs a
---       recLR : LHList (subGoalsForWH A wh) × LHList goals
---       recLR = ++⁻ (unLabels (subGoalsForWH A wh)) {!rec!} -- ++⁻ (subGoalsForWH A wh) rec
+runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → LHList Bs
+runNonRecursiveList {A} {.[]} ∎ a = []
+runNonRecursiveList {A} {(goal ∷ goals)} (pcons wh proofs) a
+  = fun (applyIndHypAll a (map⁻ recL)) ∷ proj₂ recLR
+  -- = WithHoles.holeyFun wh (applyIndHypAll a (map⁻ {f = λ Goal → LS _ ({indHyp : A} → unLabel Goal)} {!proj₁ recLR!})) ∷ proj₂ recLR
+  -- -- = WithHoles.holeyFun wh (applyIndHypAll a (map⁻ (proj₁ recLR))) ∷ proj₂ recLR
+    where
+      fun : HList (unLabels (WithHoles.labeledTypes wh)) → unLabel goal
+      fun = WithHoles.holeyFun wh
+      rec : LHList (subGoalsForWH A wh ++ goals)
+      rec with ret <- runNonRecursiveList proofs a = runNonRecursiveList proofs a -- runNonRecursiveList proofs a
+      recLR : LHList (subGoalsForWH A wh) × LHList goals
+      recLR
+        = ++⁻ (unLabels (subGoalsForWH A wh))
+          (subst (All id) (unLabels++ (List.map (holdsUnderIndHypLS A) (WithHoles.labeledTypes wh)) goals) rec) -- ++⁻ (subGoalsForWH A wh) rec
+      recL : All unLabel
+               (List.map (holdsUnderIndHypLS A) (WithHoles.labeledTypes wh))
+      recL = map⁻ {f = unLabel} (proj₁ recLR)
 
-
--- runNonRecursive : ∀ {A B} → Proof A ⇒ B → A → B
--- runNonRecursive proofs a
---   with (b ∷ []) ← runNonRecursiveList proofs a  = b
+runNonRecursive : ∀ {A B} → Proof A ⇒ B → A → B
+runNonRecursive proofs a
+  with (b ∷ []) ← runNonRecursiveList proofs a  = b
 
 -- open import Reflection
 -- open import Data.Unit
