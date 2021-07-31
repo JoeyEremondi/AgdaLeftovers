@@ -5,7 +5,7 @@ open import Leftovers.Internal.Utils
 
 
 import Level as Level
--- open import Reflection
+open import Reflection
 open import Reflection.Term
 open import Reflection.Pattern as P
 open import Reflection.TypeChecking.Monad.Instances
@@ -23,10 +23,10 @@ open import Data.Char as Char
 open import Data.String as String
 
 
-open import Leftovers.Internal.Monad
+-- open import Leftovers.Internal.Monad
 
 import Data.List.Categorical
-open Data.List.Categorical.TraversableM {m = Level.zero} leftoversMonad
+open Data.List.Categorical.TraversableM {m = Level.zero} tcMonad
 
 --This file was adapted from https://github.com/alhassy/gentle-intro-to-reflection
 
@@ -38,7 +38,7 @@ import Data.Nat.Show as NShow
 
 --Unify the goal with a function that does a case-split on an argument of the type with the given name
 -- Return the metavariables, along with telescopes, for each branch
-cases : Name → Term → Leftovers ⊤
+cases : Name → Term → TC ⊤
 cases typeName hole -- thm-you-hope-is-provable-by-refls
     = do
       -- let η = nom
@@ -56,7 +56,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
     where
       -- For each constructor, generate the clause,
       -- along with the metavariable term for its right-hand side
-      mk-cls : Type → Name → Leftovers (Clause )
+      mk-cls : Type → Name → TC (Clause )
       mk-cls holeType ctor =
          do
            debugPrint "mk-cls" 2 (strErr "mk-cls with ctor " ∷ nameErr ctor ∷ [])
@@ -88,7 +88,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
 
                debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
                -- tryUnify rhs (con (quote refl) [])
-               pure ret
+               return ret
 
 
 
