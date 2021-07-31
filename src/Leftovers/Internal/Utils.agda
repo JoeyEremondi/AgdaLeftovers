@@ -1,11 +1,11 @@
 {-# OPTIONS --without-K #-}
-module Leftovers.Utils where
+module Leftovers.Internal.Utils where
 
 open import Data.String using (String)
 open import Data.List as List
 
 -- open import Reflection
-open import Leftovers.Monad
+open import Leftovers.Internal.Monad
 open import Reflection.Term
 open import Reflection.Pattern as P
 open import Reflection.Argument as A

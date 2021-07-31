@@ -1,12 +1,12 @@
 {-# OPTIONS --without-K #-}
-module Leftovers.FindHoles where
+module Leftovers.Internal.FindHoles where
 
 open import Function using (_$_)
 open import Data.Bool
 open import Data.String as String using (String)
 
-open import Leftovers.TraverseTerm
-open import Leftovers.Utils
+open import Leftovers.Internal.TraverseTerm
+open import Leftovers.Internal.Utils
 
 import Level as Level
 open import Reflection
@@ -18,10 +18,10 @@ open import Data.Fin using (toℕ ; Fin)
 
 
 open import Reflection.DeBruijn using (weaken ; strengthen)
-import Leftovers.Everywhere
+import Leftovers.Internal.Everywhere
 import Category.Monad.State as State
 
-open Leftovers.Everywhere tcMonad
+open Leftovers.Internal.Everywhere tcMonad
 -- open import SE tcMonad -- renaming (everywhere to Severywhere ; Cxt to SCxt ; defaultActions to SdefaultActions)
 
 open import Data.Unit
@@ -55,11 +55,11 @@ open import Level.Literals using (#_)
 import Data.Fin.Reflection
 import Data.Nat.Reflection
 
-import Leftovers.Monad as L
+import Leftovers.Internal.Monad as L
 open import Relation.Binary.PropositionalEquality hiding ([_])
 
-open import Leftovers.Subst
-open import Leftovers.Proofs
+open import Leftovers.Internal.Subst
+open import Leftovers.Internal.Proofs
 
 
 
@@ -237,7 +237,7 @@ private
   consNm : Name
   consNm = quote cons
 
-open import Leftovers.LabelMetas
+open import Leftovers.Internal.LabelMetas
 
 findLeftovers : ∀ {ℓ} → Set ℓ → (Term → L.Leftovers ⊤) → TC Term
 findLeftovers targetSet theMacro =

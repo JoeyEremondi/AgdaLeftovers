@@ -1,7 +1,7 @@
 {-# OPTIONS --without-K -v 2 #-}
-module Leftovers.Equality where
+module Leftovers.Internal.Cases where
 
-open import Leftovers.Utils
+open import Leftovers.Internal.Utils
 
 
 import Level as Level
@@ -23,7 +23,7 @@ open import Data.Char as Char
 open import Data.String as String
 
 
-open import Leftovers.Monad
+open import Leftovers.Internal.Monad
 
 import Data.List.Categorical
 open Data.List.Categorical.TraversableM {m = Level.zero} leftoversMonad

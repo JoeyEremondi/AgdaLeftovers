@@ -1,5 +1,5 @@
 {-# OPTIONS --without-K --auto-inline #-}
-module Leftovers.Proofs where
+module Leftovers.Internal.Proofs where
 
 open import Data.Nat
 open import Data.List as List
@@ -10,7 +10,7 @@ open import Data.Product
 open import Data.List.Relation.Unary.All using ([] ; _∷_) public
 import Data.List.Properties as LProp
 open import Function
-open import Leftovers.Subst
+open import Leftovers.Internal.Subst
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Data.String as String using (String)
 open import Relation.Unary
@@ -226,6 +226,7 @@ switchProof :  ∀ {IndHyp} goals1 goals2
 switchProof goals1 goals2 p with (p1 , p2) ← unconcatProof goals1 goals2 p = concatProof _ _ p2 p1
 
 
+
 -- If we have an A, and a proof of Bs assuming A, then we have Bs
 runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → LHList Bs
 runNonRecursiveList {A} {.[]} ∎ a = []
@@ -254,7 +255,7 @@ runNonRecursive proofs a
 
 open import Reflection
 open import Data.Unit
-open import Leftovers.Utils
+open import Leftovers.Internal.Utils
 
 open import Data.Bool
 open import Data.String as String

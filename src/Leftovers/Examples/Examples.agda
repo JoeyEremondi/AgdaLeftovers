@@ -1,10 +1,12 @@
 
 {-# OPTIONS -v 2 --auto-inline #-}
-module Leftovers.Examples where
+module Leftovers.Examples.Examples where
 
-open import Leftovers.Utils
-open import Leftovers.FindHoles
-open import Leftovers.Equality
+open import Leftovers.Leftovers
+
+-- open import Leftovers.Utils
+-- open import Leftovers.FindHoles
+-- open import Leftovers.Equality
 
 open import Data.Bool
 open import Relation.Binary.PropositionalEquality
@@ -18,7 +20,6 @@ open import Data.List using (_∷_ ; [])
 open import Reflection
 open import Function
 
-open import Leftovers.Proofs
 
 -- notNot :  ∀ b → not (not b) ≡ b
 -- notNot = (by {A = ∀ b → not (not b) ≡ b} (quote notNot) (cases (quote Bool)) (refl , refl) ) -- (refl , refl)

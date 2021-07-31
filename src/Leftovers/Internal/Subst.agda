@@ -1,5 +1,5 @@
 {-# OPTIONS --without-K #-}
-module Leftovers.Subst where
+module Leftovers.Internal.Subst where
 
 open import Reflection
 open import Reflection.TypeChecking.Monad.Instances
@@ -9,9 +9,9 @@ open import Relation.Nullary
 open import Data.List
 open import Data.Maybe using (just ; nothing)
 
-open import Leftovers.Utils
+open import Leftovers.Internal.Utils
 open import Reflection.DeBruijn using (weaken ; strengthen)
-open import Leftovers.Everywhere tcMonad
+open import Leftovers.Internal.Everywhere tcMonad
 open import Data.Product using (_,_)
 open import Data.Bool
 

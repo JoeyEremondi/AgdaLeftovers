@@ -9,7 +9,7 @@
 open import Category.Applicative using (RawApplicative)
 open import Category.Monad using (RawMonad)
 
-module Leftovers.Everywhere {F : Set → Set} (MF : RawMonad F) where
+module Leftovers.Internal.Everywhere {F : Set → Set} (MF : RawMonad F) where
 
 open import Data.Nat     using (ℕ; zero; suc; _+_)
 open import Data.List    using (List; []; _∷_; _++_; reverse; length)

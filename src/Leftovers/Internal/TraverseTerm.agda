@@ -1,5 +1,5 @@
 {-# OPTIONS --without-K #-}
-module Leftovers.TraverseTerm where
+module Leftovers.Internal.TraverseTerm where
 
 open import Data.List
 -- We only need the writer monad, but as far as I can tell
@@ -7,7 +7,7 @@ open import Data.List
 open import Category.Monad.State
 
 open import Reflection using (Term ; Meta ; Name ; Arg)
-import Leftovers.Everywhere
+import Leftovers.Internal.Everywhere
 
 open import Relation.Binary.PropositionalEquality
 
@@ -32,7 +32,7 @@ collectFromSubterms : ∀ {A : Set} → LeafInfoMaker A → Term → List A
 collectFromSubterms {A} f t = proj₂ (stateResult [])
  where
    open RawMonadState (StateMonadState (List A))
-   open import Leftovers.Everywhere (StateMonad (List A))
+   open import Leftovers.Internal.Everywhere (StateMonad (List A))
 
    toAction : ∀ {X : Set} → (LCxt → X → Maybe A) → Action X
    toAction f cxt x with f (Cxt.context cxt) x

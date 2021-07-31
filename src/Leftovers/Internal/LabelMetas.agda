@@ -1,5 +1,5 @@
 {-# OPTIONS --without-K #-}
-module Leftovers.LabelMetas where
+module Leftovers.Internal.LabelMetas where
 
 open import Reflection as TC hiding (_>>_ ; _>>=_)
 open import Data.Product
@@ -35,7 +35,7 @@ private
   addLabel pr (St current all labels) = St current all (pr ∷ labels)
 
 open RawIMonadState (StateTMonadState LabelState tcMonad) renaming (return to sReturn)
-open import Leftovers.Everywhere (State.StateTMonad LabelState tcMonad)
+open import Leftovers.Internal.Everywhere (State.StateTMonad LabelState tcMonad)
 
 import Data.Char as Char
 

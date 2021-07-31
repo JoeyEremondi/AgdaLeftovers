@@ -1,5 +1,5 @@
 {-# OPTIONS --without-K -v 2 #-}
-module Leftovers.Monad where
+module Leftovers.Internal.Monad where
 
 
 open import Category.Functor
