@@ -148,29 +148,24 @@ nextBy_⦊_ = pcons
 
 
 
--- getHoles : ∀ {IndHyp goals} → Proofs IndHyp goals → All WithHoles goals
--- getHoles (exact x) = All.map (λ soln → withHoles [] (λ _ → soln)) x
--- getHoles (chain whs p) = whs
+---------  Some synonyms for readability
 
--- getProofs : ∀ {IndHyp goals} → (p : Proofs IndHyp goals) → Proofs IndHyp (concat (collectSubgoals IndHyp (getHoles p)))
--- getProofs (chain whs p) = p
--- getProofs {IndHyp = IndHyp} (exact x) = exact (subst HList (sym (helper x)) [])
---   where
---     helper : ∀ {goals} (x : HList goals) → (concat
---        (collectSubgoals IndHyp
---         (All.map (λ soln → withHoles [] (λ _ → soln)) x))) ≡ []
---     helper [] = refl
---     helper (x ∷ x₁) rewrite helper x₁ = refl
-
-
+-- A proof that A implies B
 Proof_⇒_ : Set → Set → Set1
 Proof A ⇒ B = Proofs A [ "Goal" ⦂⦂ B ]
 
+-- An inductive proof of A.
+-- If A is a function type, and all uses of the assumption A are made on structurally-smaller arguments,
+-- then we can use reflection to extract a value of type A.
+-- Generally should be used with the "cases" macro
+-- TODO: where is this?
 IndProof : Set → Set1
 IndProof A = Proofs A [ "Goal" ⦂⦂ A ]
 
 open import Data.List.Properties
 
+
+--------------------------------------
 
 -- We can partition a proof of some goals arbitrarily
 unconcatProof :
@@ -257,21 +252,24 @@ runNonRecursive : ∀ {A B} → Proof A ⇒ B → A → B
 runNonRecursive proofs a
   with (b ∷ []) ← runNonRecursiveList proofs a  = b
 
--- open import Reflection
--- open import Data.Unit
--- open import Leftovers.Utils
+open import Reflection
+open import Data.Unit
+open import Leftovers.Utils
 
--- open import Data.Bool
--- open import Data.String as String
+open import Data.Bool
+open import Data.String as String
 
 
--- runIndProof : ∀ {A : Set} → Name → IndProof A → TC ⊤
--- runIndProof {A} nm proof = do
---   fixpoint ← runSpeculative $ do
---     ret ← subName nm (λ (x) → the A (runNonRecursive proof x))
---     nf ← normalise ret
---     return (nf , false)
---   let cls = clauses fixpoint
---   debugPrint "" 2 (strErr "got clauses" ∷ List.map (λ c → strErr (" " String.++ (showClause c) String.++ " ")) cls)
---   defineFun nm cls
---   return tt
+-- Use reflection to take  `proof : IndProof A`
+-- and turn it into a definition named `nm` with type A
+runIndProof : ∀ {A : Set} → Name → IndProof A → TC ⊤
+runIndProof {A} nm proof = do
+  fixpoint ← runSpeculative $ do
+    ret ← subName nm (λ (x) → the A (runNonRecursive proof x))
+    nf ← normalise ret
+    return (nf , false)
+  let cls = clauses fixpoint
+  debugPrint "" 2 (strErr "got clauses" ∷ List.map (λ c → strErr (" " String.++ (showClause c) String.++ " ")) cls)
+  defineFun nm cls
+  return tt
+
