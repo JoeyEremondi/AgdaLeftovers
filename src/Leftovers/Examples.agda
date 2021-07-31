@@ -3,7 +3,7 @@
 module Leftovers.Examples where
 
 open import Leftovers.Utils
-open import Leftovers.Leftovers
+open import Leftovers.FindHoles
 open import Leftovers.Equality
 
 open import Data.Bool

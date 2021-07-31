@@ -2,7 +2,7 @@
 -- than to be clear/readable
 module Leftovers.Tests where
 
-open import Leftovers.Leftovers
+open import Leftovers.FindHoles
 open import Leftovers.ByRefl
 
 open import Level

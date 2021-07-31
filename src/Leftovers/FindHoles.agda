@@ -1,5 +1,5 @@
 {-# OPTIONS --without-K #-}
-module Leftovers.Leftovers where
+module Leftovers.FindHoles where
 
 open import Function using (_$_)
 open import Data.Bool

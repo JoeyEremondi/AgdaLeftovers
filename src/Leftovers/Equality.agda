@@ -2,7 +2,6 @@
 module Leftovers.Equality where
 
 open import Leftovers.Utils
--- open import Leftovers.Leftovers
 
 
 import Level as Level
