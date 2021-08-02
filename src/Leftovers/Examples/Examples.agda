@@ -32,7 +32,6 @@ open import Data.Nat
 -- syntax applyTo e₁ (λ x → e₂) = x ≔ e₁ ︔ e₂
 
 open import Leftovers.Internal.Proofs
-open import Data.List.Any
 
 -- This one works and passes the termination checker
 plusZero : ∀ n → n ≡ n + 0
@@ -41,13 +40,13 @@ plusZero = helper
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
-      DoCase zero by
+      DoCase "zero" by
         (default (λ {_ : (n : ℕ) → n ≡ n + 0} → refl {x = 0})) ⦊
-      ExactCase-syntax (λ suc → λ {rec} x → cong {!suc!} {!!})  ∎
+      Case "suc" by (λ {rec} x → cong suc (rec x)) ⦊ ∎
       -- (nextBy manual (λ {self} x → cong suc (self x)) ⦊
       -- (nextBy manual refl ⦊ ∎ ))
     helper : ∀ n → n ≡ n + 0
-    -- unquoteDef helper = runIndProof helper proof
+    unquoteDef helper = runIndProof helper proof
 
 -- plusZero : ∀ n → n ≡ n + 0
 -- unquoteDef plusZero = defineBy {A = ∀ n → n ≡ n + 0} plusZero (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl)

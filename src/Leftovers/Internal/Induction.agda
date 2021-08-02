@@ -52,7 +52,7 @@ getName fun unifGoal = do
   unify unifGoal (lit (string theName))
 
 
-stringCase :
+DoCase_by_⦊_ :
     (str : String) →
     ∀ {IndHyp goals} →
     {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals}
@@ -60,33 +60,14 @@ stringCase :
     {@(tactic runSpec (findLeftovers (unLabel goal) tac)) wh : WithHoles (unLabel goal)} →
     MiddleGoalType IndHyp wh mem ->
     Proofs IndHyp goals
-stringCase str {IndHyp} {goals} {MkLM goal mem} _ {wh}  = solveMember wh mem
+DoCase_by_⦊_ str {IndHyp} {goals} {MkLM goal mem} _ {wh}  = solveMember wh mem
 
--- Terrible hack: we thunk the tactic argument
--- and use the parameter name of the thunk as the name of the case
--- so that we don't need to put everything in quotes
-DoCase-syntax :
-    (tac : ⊤ → Term → TC ⊤) →
-    {@(tactic getName tac) str : String} →
+
+Case_by_⦊_ :
+    (str : String) →
     ∀ {IndHyp goals} →
     {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals}
-    -- (tac : Term → TC ⊤) →
-    {@(tactic runSpec (findLeftovers (unLabel goal) (tac tt))) wh : WithHoles (unLabel goal)} →
-    MiddleGoalType IndHyp wh mem ->
+    (result : unLabel goal) →
+    MiddleGoalType IndHyp (trivialHole result) mem ->
     Proofs IndHyp goals
-DoCase-syntax _ {goals = goals} {MkLM goal mem} {wh} = solveMember wh mem
-
-ExactCase-syntax :
-    ∀ {A : Set} →
-    (result : ⊤ → A) →
-    {@(tactic getName result) str : String} →
-    ∀ {IndHyp goals} →
-    {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals} →
-    {@(tactic (λ t → unify t (quoteTerm (refl {x = A})))) eq : A ≡ unLabel goal} →
-    MiddleGoalType IndHyp (withHoles [] (λ _ → subst (λ x → x) eq (result tt))) mem →
-    Proofs IndHyp goals
-ExactCase-syntax result {goals = goals} {MkLM goal mem} {eq} =
-  solveMember ((withHoles [] (λ _ → subst (λ x → x) eq (result tt)))) mem
-
-syntax DoCase-syntax (λ x → tac) rest = DoCase x by tac ⦊ rest
-syntax ExactCase-syntax (λ x → result) rest = Case x by result ⦊ rest
+Case_by_⦊_ str {IndHyp} {goals} {MkLM goal mem} result   = solveMember (trivialHole result) mem

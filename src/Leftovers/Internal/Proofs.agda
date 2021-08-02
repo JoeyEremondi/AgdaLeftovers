@@ -125,10 +125,13 @@ data Proofs (IndHyp : Set) : (goals : List LSet) → Set1 where
       Proofs IndHyp ((subGoalsForWH IndHyp wh) ++ goals) ->
     Proofs IndHyp (goal ∷ goals)
 
+trivialHole : ∀ {A} → A → WithHoles A
+trivialHole x = withHoles [] (λ _ → x)
+
 -- If we have inhabitants for each goal type, then we have a proof of those goals under any hypothesis
 exact : ∀ {IndHyp goals} → HList (unLabels goals) → Proofs IndHyp goals
 exact {goals = []} [] = ∎
-exact {goals = x ∷ goals} (px ∷ elems) = pcons (withHoles [] (λ _ → px)) (exact elems)
+exact {goals = x ∷ goals} (px ∷ elems) = pcons (trivialHole px) (exact elems)
 
 
 -- Every proof is a 0-hole holey proof
