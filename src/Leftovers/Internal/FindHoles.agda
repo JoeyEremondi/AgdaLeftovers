@@ -351,5 +351,5 @@ doRun _ {x} = x
 open import Relation.Nullary
 
 
-default : {A : Set} → A → Term → TC ⊤
+default : ∀ {ℓ} {A : Set ℓ} → A → Term → TC ⊤
 default x hole = bindTC (quoteTC x) (unify hole)

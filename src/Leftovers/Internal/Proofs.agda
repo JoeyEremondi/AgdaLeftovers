@@ -13,7 +13,7 @@ open import Function
 open import Leftovers.Internal.Subst
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Data.String as String using (String)
-open import Relation.Unary
+open import Relation.Unary hiding (_∈_)
 
 
 ------------------------------------------------------------------
@@ -140,11 +140,11 @@ plength ∎ = 0
 plength (pcons wh p) = suc (plength p)
 
 -- Syntactic sugar for pcons
-nextBy_⦊_ : ∀ {IndHyp goal goals} →
-    (wh : WithHoles (unLabel goal)) →
-      Proofs IndHyp ((subGoalsForWH IndHyp wh) ++ goals) ->
-    Proofs IndHyp (goal ∷ goals)
-nextBy_⦊_ = pcons
+-- nextBy_⦊_ : ∀ {IndHyp goal goals} →
+--     (wh : WithHoles (unLabel goal)) →
+--       Proofs IndHyp ((subGoalsForWH IndHyp wh) ++ goals) ->
+--     Proofs IndHyp (goal ∷ goals)
+-- nextBy_⦊_ = pcons
 
 
 
@@ -258,7 +258,7 @@ open import Data.Unit
 open import Leftovers.Internal.Utils
 
 open import Data.Bool
-open import Data.String as String
+-- open import Data.String as String
 
 
 -- Use reflection to take  `proof : IndProof A`
@@ -274,3 +274,48 @@ runIndProof {A} nm proof = do
   defineFun nm cls
   return tt
 
+
+----------------------------------------
+-- Solving goals in the middle of a list
+
+open import Data.List.Membership.Propositional
+open import Data.List.Membership.Propositional.Properties
+open import Data.List.Relation.Unary.Any using (here ; there)
+open import Data.Maybe
+
+-- Find the first goal whose label matches the given predicate
+findLabel : (pred : String → Bool) → (goals : List LSet) → Maybe (∃[ goal ]( goal ∈ goals × pred (theLabel goal) ≡ true ))
+findLabel pred [] = nothing
+findLabel pred (goal ∷ goals) with pred (theLabel goal) in eq
+... | true = just (goal , here refl , eq)
+... | false with findLabel pred goals
+... | nothing = nothing
+... | just (result , member , predProof) = just (result , there member , predProof)
+
+
+-- Solve a goal in the middle of a goal list
+solveMiddle : ∀ {IndHyp goal goals1 goals2} →
+    (wh : WithHoles (unLabel goal)) →
+      Proofs IndHyp ((subGoalsForWH IndHyp wh) ++ goals1 ++ goals2) ->
+    Proofs IndHyp (goals1 ++ [ goal ] ++ goals2)
+solveMiddle {IndHyp} {goal = goal} {goals1} {goals2} wh pf
+  with (pfgoal , pf12) ← unconcatProof (subGoalsForWH IndHyp wh) (goals1 ++ goals2) pf
+  with (pf1 , pf2) ← unconcatProof goals1 goals2 pf12
+  = switchProof ([ goal ] ++ goals2) goals1
+    (pcons wh
+      (concatProof (subGoalsForWH IndHyp wh) (([] ++ goals2) ++ goals1) pfgoal
+      (concatProof goals2 goals1 pf2 pf1)))
+
+-- Helper: make Proofs type from the evidence that a goal is in a goal list
+MiddleGoalType : ∀ (IndHyp : Set) {goal goals} → WithHoles (unLabel goal) → goal ∈ goals → Set1
+MiddleGoalType IndHyp wh member with (goals1 , goals2 , _) ← ∈-∃++ member =
+  Proofs IndHyp (subGoalsForWH IndHyp wh ++ goals1 ++ goals2)
+
+-- Given a goal occurring somewhere in a goal list, and a holey proof of that goal, and proofs of the remaining goals,
+-- construct a proof of the entire goal list
+solveMember : ∀ {IndHyp goal goals} →
+    (wh : WithHoles (unLabel goal)) →
+    (member : goal ∈ goals) →
+    MiddleGoalType IndHyp wh member ->
+    Proofs IndHyp goals
+solveMember wh member pf with (goals1 , goals2 , refl) ← ∈-∃++ member = solveMiddle wh pf
