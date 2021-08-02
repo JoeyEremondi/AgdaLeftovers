@@ -283,14 +283,20 @@ open import Data.List.Membership.Propositional.Properties
 open import Data.List.Relation.Unary.Any using (here ; there)
 open import Data.Maybe
 
+record LabelMatch (goals : List LSet) : Set1 where
+  constructor MkLM
+  field
+    matchedGoal : LSet
+    matchMember : matchedGoal ∈ goals
+
 -- Find the first goal whose label matches the given predicate
-findLabel : (pred : String → Bool) → (goals : List LSet) → Maybe (∃[ goal ]( goal ∈ goals × pred (theLabel goal) ≡ true ))
+findLabel : (pred : String → Bool) → (goals : List LSet) → Maybe (LabelMatch goals)
 findLabel pred [] = nothing
-findLabel pred (goal ∷ goals) with pred (theLabel goal) in eq
-... | true = just (goal , here refl , eq)
+findLabel pred (goal ∷ goals) with pred (theLabel goal)
+... | true = just (MkLM goal (here refl))
 ... | false with findLabel pred goals
 ... | nothing = nothing
-... | just (result , member , predProof) = just (result , there member , predProof)
+... | just (MkLM result member) = just (MkLM result (there member))
 
 
 -- Solve a goal in the middle of a goal list

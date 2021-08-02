@@ -30,7 +30,8 @@ open import Function
 -- infixr 40 applyTo
 -- syntax applyTo e₁ (λ x → e₂) = x ≔ e₁ ︔ e₂
 
-
+open import Leftovers.Internal.Proofs
+open import Data.List.Any
 
 -- This one works and passes the termination checker
 plusZero : ∀ n → n ≡ n + 0
@@ -39,7 +40,7 @@ plusZero = helper
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
-      Case suc by ? ⦊ ?
+      lambdaCaseBy (λ zero → zero)  (default (λ {_ : (n : ℕ) → n ≡ n + 0} → refl {x = 0})) {!!}
       -- (nextBy manual (λ {self} x → cong suc (self x)) ⦊
       -- (nextBy manual refl ⦊ ∎ ))
     helper : ∀ n → n ≡ n + 0
