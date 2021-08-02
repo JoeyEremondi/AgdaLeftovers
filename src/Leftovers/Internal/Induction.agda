@@ -19,6 +19,8 @@ open import Data.Empty
 
 open import Data.Maybe using (Maybe ; just ; nothing)
 
+open import Function
+
 -- data FoundLabel (goals : List LSet) : Maybe (∃[ goal ](goal ∈ goals)) → Set where
 --   instance FoundJust : ∀ {pair} → FoundLabel goals (just pair)
 
@@ -43,22 +45,14 @@ maybeLamName : Term → TC String
 maybeLamName (lam v (abs s x)) = return s
 maybeLamName _ = typeError (strErr "Impossible, got lambda name of non-lambda" ∷ [])
 
-getName : (⊤ → ⊥ → ⊤ ) → Term → TC ⊤
+getName : ∀ {ℓ} {A : Set ℓ} → (⊤ → A ) → Term → TC ⊤
 getName fun unifGoal = do
   theFun ← quoteTC fun
   theName ← maybeLamName theFun
   unify unifGoal (lit (string theName))
 
-memberCaseBy :
-    ∀ {IndHyp goals} →
-    (goal : LSet) → (mem : goal ∈ goals) →
-    (tac : Term → TC ⊤) →
-    {@(tactic runSpec (findLeftovers (unLabel goal) tac)) wh : WithHoles (unLabel goal)} →
-    MiddleGoalType IndHyp wh mem ->
-    Proofs IndHyp goals
-memberCaseBy goal mem _ {wh} = solveMember wh mem
 
-strCase_by_⦊_ :
+stringCase :
     (str : String) →
     ∀ {IndHyp goals} →
     {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals}
@@ -66,23 +60,33 @@ strCase_by_⦊_ :
     {@(tactic runSpec (findLeftovers (unLabel goal) tac)) wh : WithHoles (unLabel goal)} →
     MiddleGoalType IndHyp wh mem ->
     Proofs IndHyp goals
-strCase_by_⦊_ str {IndHyp} {goals} {MkLM goal mem}  = memberCaseBy goal mem
+stringCase str {IndHyp} {goals} {MkLM goal mem} _ {wh}  = solveMember wh mem
 
-lambdaCaseBy :
-    (dummy : ⊤ → ⊥ → ⊤)
-    {@(tactic getName dummy) str : String} →
+-- Terrible hack: we thunk the tactic argument
+-- and use the parameter name of the thunk as the name of the case
+-- so that we don't need to put everything in quotes
+DoCase-syntax :
+    (tac : ⊤ → Term → TC ⊤) →
+    {@(tactic getName tac) str : String} →
     ∀ {IndHyp goals} →
     {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals}
-    (tac : Term → TC ⊤) →
     -- (tac : Term → TC ⊤) →
-    {@(tactic runSpec (findLeftovers (unLabel goal) tac)) wh : WithHoles (unLabel goal)} →
+    {@(tactic runSpec (findLeftovers (unLabel goal) (tac tt))) wh : WithHoles (unLabel goal)} →
     MiddleGoalType IndHyp wh mem ->
     Proofs IndHyp goals
-lambdaCaseBy dummy {str} {IndHyp} {goals} {MkLM goal mem}  = memberCaseBy goal mem
+DoCase-syntax _ {goals = goals} {MkLM goal mem} {wh} = solveMember wh mem
 
+ExactCase-syntax :
+    ∀ {A : Set} →
+    (result : ⊤ → A) →
+    {@(tactic getName result) str : String} →
+    ∀ {IndHyp goals} →
+    {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals} →
+    {@(tactic (λ t → unify t (quoteTerm (refl {x = A})))) eq : A ≡ unLabel goal} →
+    MiddleGoalType IndHyp (withHoles [] (λ _ → subst (λ x → x) eq (result tt))) mem →
+    Proofs IndHyp goals
+ExactCase-syntax result {goals = goals} {MkLM goal mem} {eq} =
+  solveMember ((withHoles [] (λ _ → subst (λ x → x) eq (result tt)))) mem
 
--- syntax lambdaCaseBy (λ x → 0) tac rest = Case x by tac ⦊ rest ⦊ n
-
--- macro
---   Case_by_⦊_ : Name → Term → TC ⊤
---   Case_by_⦊_ nm unifGoal = unify unifGoal (quoteTerm (strCase_by_⦊_ (showName nm)))
+syntax DoCase-syntax (λ x → tac) rest = DoCase x by tac ⦊ rest
+syntax ExactCase-syntax (λ x → result) rest = Case x by result ⦊ rest

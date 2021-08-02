@@ -19,6 +19,7 @@ open import Data.List using (_∷_ ; [])
 
 open import Reflection
 open import Function
+open import Data.Nat
 
 
 -- notNot :  ∀ b → not (not b) ≡ b
@@ -40,7 +41,9 @@ plusZero = helper
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
-      lambdaCaseBy (λ zero → zero)  (default (λ {_ : (n : ℕ) → n ≡ n + 0} → refl {x = 0})) {!!}
+      DoCase zero by
+        (default (λ {_ : (n : ℕ) → n ≡ n + 0} → refl {x = 0})) ⦊
+      ExactCase-syntax (λ suc → λ {rec} x → cong {!suc!} {!!})  ∎
       -- (nextBy manual (λ {self} x → cong suc (self x)) ⦊
       -- (nextBy manual refl ⦊ ∎ ))
     helper : ∀ n → n ≡ n + 0
