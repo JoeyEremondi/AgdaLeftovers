@@ -6,4 +6,4 @@ open import Leftovers.Internal.FindHoles using (prove_byInduction_⦊_ ; default
 
 open import Leftovers.Internal.Cases using (cases) public
 
-open import Leftovers.Internal.Induction public
+open import Leftovers.Internal.Generic public

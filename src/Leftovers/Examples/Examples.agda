@@ -43,8 +43,6 @@ plusZero = helper
       DoCase "zero" by
         (default (λ {_ : (n : ℕ) → n ≡ n + 0} → refl {x = 0})) ⦊
       Case "suc" by (λ {rec} x → cong suc (rec x)) ⦊ ∎
-      -- (nextBy manual (λ {self} x → cong suc (self x)) ⦊
-      -- (nextBy manual refl ⦊ ∎ ))
     helper : ∀ n → n ≡ n + 0
     unquoteDef helper = runIndProof helper proof
 

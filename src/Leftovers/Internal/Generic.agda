@@ -1,4 +1,4 @@
-module Leftovers.Internal.Induction where
+module Leftovers.Internal.Generic where
 
 open import Reflection
 open import Reflection.Show using (showName)
