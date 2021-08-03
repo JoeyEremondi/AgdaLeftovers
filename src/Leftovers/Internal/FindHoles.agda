@@ -320,7 +320,7 @@ open import Data.List.Properties using (++-identityʳ )
 prove_byInduction_⦊_ : ∀ (A : Set)
   → (@0 theMacro : Term → TC ⊤)
   → {@(tactic runSpec (findLeftovers A theMacro)) wh : WithHoles A}
-  → (holes : Proofs A (List.map (λ (label ⦂⦂ Goal) → label ⦂⦂ ({A} → Goal) ) (WithHoles.labeledTypes wh)) )
+  → (holes : Proofs A (List.map (λ (label ⦂⦂ Goal) → label ⦂⦂ (Hyp A → Goal) ) (WithHoles.labeledTypes wh)) )
   -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
   → IndProof A
 prove_byInduction_⦊_ A theMacro {wh} holes = pcons wh (subst (Proofs A) (sym (List.++-identityʳ _ )) holes) --  (wh ∷ []) (concatProofs holes)

@@ -1,6 +1,6 @@
 module Leftovers.Leftovers where
 
-open import Leftovers.Internal.Proofs using (Proofs ; IndProof ; Proof_⇒_) public
+open import Leftovers.Internal.Proofs using (Proofs ; IndProof ; Proof_⇒_ ; pcons ; ∎ ; runIndProof) public
 
 open import Leftovers.Internal.FindHoles using (prove_byInduction_⦊_ ; default) public
 

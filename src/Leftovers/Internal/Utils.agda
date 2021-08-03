@@ -22,17 +22,18 @@ open import Level
 
 
 freshMeta : Type → TC Term
-freshMeta t = do
-  theMeta ← newMeta t
-  debugPrint "freshMeta" 2 (strErr "Fresh meta " ∷ termErr theMeta ∷ strErr " with type " ∷ termErr t ∷ [])
-  ctx ← getContext
-  getMeta theMeta
-  -- logHole (mkHole m theMeta ctx)
-  return theMeta
-  where
-    getMeta : Term → TC Meta
-    getMeta (meta m _ ) = return m
-    getMeta t =  (typeError (strErr "Foo" ∷ []))
+freshMeta = newMeta
+-- freshMeta t = do
+--   theMeta ← newMeta t
+--   debugPrint "freshMeta" 2 (strErr "Fresh meta " ∷ termErr theMeta ∷ strErr " with type " ∷ termErr t ∷ [])
+--   ctx ← getContext
+--   getMeta theMeta
+--   -- logHole (mkHole m theMeta ctx)
+--   return theMeta
+--   where
+--     getMeta : Term → TC Meta
+--     getMeta (meta m _ ) = return m
+--     getMeta t =  (typeError (strErr "GetMeta returned invlaid meta " ∷ termErr t ∷  []))
 
 -- case_of_ : ∀ {A B : Set} → A → (A → B) → B
 -- case x of f = f x

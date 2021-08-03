@@ -30,6 +30,11 @@ record LSet : Set1 where
 
 open LSet public
 
+-- Here just so that Auto doesn't prematurely pick up the inductive hypothesis
+record Hyp A : Set where
+  constructor packHyp
+  field
+    recur : A
 
 unLabels : List LSet -> List Set
 unLabels = List.map unLabel
@@ -64,7 +69,7 @@ curryHList {doms = dom ∷ doms} {cod} f = λ x → curryHList {doms = doms} λ 
 -- iff the input LSet is inhabited whenever the given hypothesis is
 -- i.e. produces the proper implicit function type
 holdsUnderIndHypLS : Set → LSet → LSet
-holdsUnderIndHypLS IndHyp (label ⦂⦂ Goal) = label ⦂⦂ ({indHyp : IndHyp} → Goal)
+holdsUnderIndHypLS IndHyp (label ⦂⦂ Goal) = label ⦂⦂ (Hyp IndHyp → Goal)
 
 -- Same as above, but removes the labels from the result
 holdsUnderIndHyp : Set → LSet → Set
@@ -74,8 +79,8 @@ holdsUnderIndHyp IndHyp X = unLabel (holdsUnderIndHypLS IndHyp X)
 -- If each element of a list of LSets is implied by some hypothesis,
 -- and we have a proof of that hypthesis,
 -- then each element is inhabited.
-applyIndHypAll : ∀ {IndHyp types} → IndHyp → All (holdsUnderIndHyp IndHyp) types → LHList types
-applyIndHypAll hyp allUnder = All.map (λ {x} fun → fun {hyp}) (map⁺ allUnder)
+applyIndHypAll : ∀ {IndHyp types} → Hyp IndHyp → All (holdsUnderIndHyp IndHyp) types → LHList types
+applyIndHypAll hyp allUnder = All.map (λ {x} fun → fun hyp) (map⁺ allUnder)
 
 ---------------------------------------------------
 ------ Types with holes
@@ -234,7 +239,7 @@ switchProof goals1 goals2 p with (p1 , p2) ← unconcatProof goals1 goals2 p = c
 runNonRecursiveList : ∀ {A Bs} → Proofs A  Bs → A → LHList Bs
 runNonRecursiveList {A} {.[]} ∎ a = []
 runNonRecursiveList {A} {(goal ∷ goals)} (pcons wh proofs) a
-  = fun (applyIndHypAll a (map⁻ recL)) ∷ proj₂ recLR
+  = fun (applyIndHypAll (packHyp a) (map⁻ recL)) ∷ proj₂ recLR
   -- = WithHoles.holeyFun wh (applyIndHypAll a (map⁻ {f = λ Goal → LS _ ({indHyp : A} → unLabel Goal)} {!proj₁ recLR!})) ∷ proj₂ recLR
   -- -- = WithHoles.holeyFun wh (applyIndHypAll a (map⁻ (proj₁ recLR))) ∷ proj₂ recLR
     where
