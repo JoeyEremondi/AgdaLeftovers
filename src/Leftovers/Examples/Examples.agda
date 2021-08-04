@@ -33,6 +33,10 @@ open import Data.Nat
 
 open import Leftovers.Internal.Proofs
 
+
+default : ∀ {A : Set} → A → Term → TC ⊤
+default x hole = bindTC (quoteTC x) (unify hole)
+
 -- This one works and passes the termination checker
 plusZero : ∀ n → n ≡ n + 0
 plusZero = helper
@@ -40,11 +44,13 @@ plusZero = helper
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
+      Case "suc" by (λ rec x → cong suc (recur rec x)) ⦊
       DoCase "zero" by
-        (default (λ {_ : (n : ℕ) → n ≡ n + 0} → refl {x = 0})) ⦊
-      Case "suc" by (λ {rec} x → cong suc (rec x)) ⦊ ∎
+        (default (λ _ → _)) ⦊
+      {!!}
+
     helper : ∀ n → n ≡ n + 0
-    unquoteDef helper = runIndProof helper proof
+    -- unquoteDef helper = runIndProof helper proof
 
 -- plusZero : ∀ n → n ≡ n + 0
 -- unquoteDef plusZero = defineBy {A = ∀ n → n ≡ n + 0} plusZero (cases (quote ℕ)) (λ {self} → (λ x → cong suc (self x)) , refl)

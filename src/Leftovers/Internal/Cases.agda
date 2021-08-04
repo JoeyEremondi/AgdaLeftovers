@@ -44,31 +44,31 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       -- let η = nom
       δ ← getDefinition typeName
       holeType ← inferType hole
-      debugPrint "refl-cases" 2 (strErr " hole type to start " ∷ termErr holeType ∷ [])
+      debugPrint "Leftovers" 2 (strErr " hole type to start " ∷ termErr holeType ∷ [])
       clauses ← forM (constructors δ) (mk-cls holeType)
       -- declareDef (vArg η) holeType
       let retFun = (pat-lam clauses [])
       normFun ← reduce retFun
-      debugPrint "refl-cases" 2 (strErr "reflcases ret non-norm " ∷ termErr retFun ∷ [])
+      debugPrint "Leftovers" 2 (strErr "reflcases ret non-norm " ∷ termErr retFun ∷ [])
       unify hole (normFun ⦂ holeType)
       normHole ← reduce hole
-      debugPrint "refl-cases" 2 (strErr "reflCases final " ∷ termErr normHole ∷ [])
+      debugPrint "Leftovers" 2 (strErr "reflCases final " ∷ termErr normHole ∷ [])
     where
       -- For each constructor, generate the clause,
       -- along with the metavariable term for its right-hand side
       mk-cls : Type → Name → TC (Clause )
       mk-cls holeType ctor =
          do
-           debugPrint "mk-cls" 2 (strErr "mk-cls with ctor " ∷ nameErr ctor ∷ [])
+           debugPrint "Leftovers" 2 (strErr "mk-cls with ctor " ∷ nameErr ctor ∷ [])
            fullyApplied <- fully-applied-pattern ctor
            let
              patArgs = List.map CtorArg.pat fullyApplied
              patTerm = List.map CtorArg.term fullyApplied
              patTypes = List.map CtorArg.type fullyApplied
            extendContexts patTypes do
-               debugPrint "" 2 (strErr "before retType " ∷ termErr holeType ∷ strErr "   and   " ∷ termErr (con ctor patTerm) ∷  [])
+               debugPrint "Leftovers" 2 (strErr "before retType " ∷ termErr holeType ∷ strErr "   and   " ∷ termErr (con ctor patTerm) ∷  [])
                retType ← returnTypeFor holeType (con ctor patTerm)
-               debugPrint "mk-cls" 2 (strErr "retType is  " ∷ termErr retType ∷ [])
+               debugPrint "Leftovers" 2 (strErr "retType is  " ∷ termErr retType ∷ [])
                -- Make the right-hand side in an extended context
                -- with new pattern-match variables
                rhs ← freshMeta retType
@@ -77,7 +77,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
                    List.map
                      (λ (x , n) → ( "arg" String.++ NShow.show n , x ))
                      (List.zip patTypes (List.upTo (List.length patTypes)))
-               debugPrint "mk-cls" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
+               debugPrint "Leftovers" 2 (strErr "Pat" ∷ strErr (showPatterns patArgs) ∷ [] )
                let
                  ret =
                    (clause
@@ -86,7 +86,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
                      (rhs ⦂ retType)
                      )
 
-               debugPrint "mk-cls" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
+               debugPrint "Leftovers" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])
                -- tryUnify rhs (con (quote refl) [])
                return ret
 

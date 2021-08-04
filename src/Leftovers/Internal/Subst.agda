@@ -41,13 +41,13 @@ subName {X = X} nm f = do
   XType ← quoteTC X
   XX ← quoteTC (X → X)
   fterm ← quoteTC f
-  debugPrint "subName" 2 (strErr "subName input " ∷ termErr fterm ∷ [] )
+  debugPrint "Leftovers" 2 (strErr "subName input " ∷ termErr fterm ∷ [] )
   -- checkType goal XType
   case fterm of λ
     {( lam _ (abs _ body)) → do
       ret ← tsubst (def nm []) 0 body
       nf ← specNorm (ret ⦂ XType)
-      debugPrint "subName" 2 (strErr "subName result " ∷ termErr nf ∷ [] )
+      debugPrint "Leftovers" 2 (strErr "subName result " ∷ termErr nf ∷ [] )
       return (nf ⦂ XType)
     ; _ → typeError (strErr "Can't replace var in non-lambda term " ∷ termErr fterm ∷ [])
     }

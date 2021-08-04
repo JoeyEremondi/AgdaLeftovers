@@ -36,6 +36,8 @@ record Hyp A : Set where
   field
     recur : A
 
+open Hyp public
+
 unLabels : List LSet -> List Set
 unLabels = List.map unLabel
 
@@ -278,7 +280,7 @@ runIndProof {A} nm proof = do
     nf ← normalise ret
     return (nf , false)
   let cls = clauses fixpoint
-  debugPrint "" 2 (strErr "got clauses" ∷ List.map (λ c → strErr (" " String.++ (showClause c) String.++ " ")) cls)
+  debugPrint "Leftovers" 2 (strErr "got clauses" ∷ List.map (λ c → strErr (" " String.++ (showClause c) String.++ " ")) cls)
   defineFun nm cls
   return tt
 

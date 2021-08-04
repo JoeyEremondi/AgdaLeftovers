@@ -25,7 +25,7 @@ freshMeta : Type → TC Term
 freshMeta = newMeta
 -- freshMeta t = do
 --   theMeta ← newMeta t
---   debugPrint "freshMeta" 2 (strErr "Fresh meta " ∷ termErr theMeta ∷ strErr " with type " ∷ termErr t ∷ [])
+--   debugPrint "Leftovers" 2 (strErr "Fresh meta " ∷ termErr theMeta ∷ strErr " with type " ∷ termErr t ∷ [])
 --   ctx ← getContext
 --   getMeta theMeta
 --   -- logHole (mkHole m theMeta ctx)
@@ -91,7 +91,7 @@ genericApp f (arg (arg-info instance′ m) x) = iapp f x
 
 returnTypeFor : Type → Term → TC Type
 returnTypeFor (pi (arg _ dom) cod) x = do
-  debugPrint "returnTypeFor" 2 (strErr "Checking pattern " ∷ termErr x ∷ strErr "  against type  " ∷ termErr dom ∷ [])
+  debugPrint "Leftovers" 2 (strErr "Checking pattern " ∷ termErr x ∷ strErr "  against type  " ∷ termErr dom ∷ [])
   checkType x dom
   return (app (lam visible cod) x)
 returnTypeFor t x = do
@@ -140,7 +140,6 @@ fully-applied-pattern : Name → TC (List (CtorArg))
 fully-applied-pattern nm =
   do
     nmType ← getType nm
-    -- debugPrint "full-app" 2 (strErr "fullApp " ∷ nameErr nm ∷ termErr nmType ∷ [])
     return (full-app-type nmType 0)
   where
     full-app-type : Type → ℕ → List (CtorArg)

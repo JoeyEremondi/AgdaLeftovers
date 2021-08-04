@@ -1,11 +1,13 @@
 {-# OPTIONS --without-K #-}
-module Leftovers.Internal.LabelMetas where
+open import Data.String
+open import Data.String.Properties
+module Leftovers.Internal.LabelMetas (starter : String) where
 
 open import Reflection as TC hiding (_>>_ ; _>>=_)
 open import Data.Product
 import Data.String as String
 open import Data.String using (String)
-open import Data.List as List
+open import Data.List as List hiding (_++_)
 open import Category.Monad.State as State
 open import Reflection.Term
 open import Reflection.TypeChecking.Monad.Instances
@@ -13,6 +15,12 @@ open import Reflection.Argument using (unArg)
 open import Data.Unit
 
 open import Reflection.Show as Show
+
+open import Function
+open import Data.Bool
+
+prefix : String
+prefix = case (starter == "") of (λ { true → "" ; false → starter ++ " " })
 
 
 private
@@ -42,28 +50,28 @@ import Data.Char as Char
 private
   shortName : Name → String
   shortName n with List.reverse (String.wordsBy (λ c → c Char.≟ '.') (Show.showName n))
-  ... | [] = ""
-  ... | s ∷ _ = s
+  ... | [] = starter
+  ... | s ∷ _ = prefix ++ s
 
   lift : ∀ {A : Set} → TC A → State.StateT LabelState TC A
   lift comp s = comp TC.>>= λ x → return (x , s)
 
   patString : Arg Pattern → String
   patString (arg i (con c ps)) = shortName c
-  patString (arg i (dot t)) = ""
-  patString (arg i (var x)) = ""
-  patString (arg i (lit l)) = Show.showLiteral l
-  patString (arg i (proj f)) = shortName f
-  patString (arg i (absurd x)) = ""
+  patString (arg i (dot t)) = starter
+  patString (arg i (var x)) = starter
+  patString (arg i (lit l)) = prefix ++ Show.showLiteral l
+  patString (arg i (proj f)) = prefix ++ shortName f
+  patString (arg i (absurd x)) = starter
 
   clauseString : Clause → String
-  clauseString (clause tel ps t) = String.intersperse "--" (List.map patString ps)
-  clauseString (absurd-clause tel ps) = String.intersperse "--" (List.map patString ps)
+  clauseString (clause tel ps t) = prefix ++ String.intersperse " " (List.map patString ps)
+  clauseString (absurd-clause tel ps) = prefix ++ String.intersperse " " (List.map patString ps)
 
   beforeAfter : Cxt → BeforeAfter → Cursor → State.StateT LabelState TC ⊤
   beforeAfter _ Before (CClause c) = do
     modify (push (clauseString c))
-    lift (debugPrint "" 2 (strErr "Adding ctx " ∷ strErr (clauseString c) ∷ []))
+    lift (debugPrint "Leftovers" 2 (strErr "Adding ctx " ∷ strErr (clauseString c) ∷ []))
     sReturn tt
   beforeAfter _ After (CClause c) = do
     modify pop
@@ -73,13 +81,13 @@ private
   metaAction : Action Meta
   metaAction Γ m = do
     st ← get
-    lift (debugPrint "" 2 (strErr "Logging meta " ∷ termErr (meta m []) ∷ []))
-    modify (addLabel ((m , String.intersperse "--" (LabelState.currentTags st))))
+    lift (debugPrint "Leftovers" 2 (strErr "Logging meta " ∷ termErr (meta m []) ∷ []))
+    modify (addLabel ((m , String.intersperse " " (LabelState.currentTags st))))
     sReturn m
 
 eachAction : Term →  State.StateT LabelState TC Term
 eachAction t = do
-  lift (debugPrint "" 2 (strErr "At term " ∷ termErr t ∷ []))
+  lift (debugPrint "Leftovers" 2 (strErr "At term " ∷ termErr t ∷ []))
   sReturn t
 
 labelMetas : Term → TC (List (Meta × String))

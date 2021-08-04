@@ -67,7 +67,7 @@ run : (TC Term) → Term → TC ⊤
 run comp goal = do
   t ← comp
   unify t goal
-  debugPrint "" 2 (strErr "run generating " ∷ termErr t ∷ [])
+  debugPrint "Leftovers" 2 (strErr "run generating " ∷ termErr t ∷ [])
 
 
 runSpec : (TC Term) → Term → TC ⊤
@@ -76,22 +76,12 @@ runSpec comp goal = do
     t' ← comp
     return (t' , false)
   unify t goal
-  debugPrint "" 2 (strErr "runSpec generating " ∷ termErr t ∷ [])
+  debugPrint "Leftovers" 2 (strErr "runSpec generating " ∷ termErr t ∷ [])
 
 
 
 open import Agda.Builtin.Nat using (_-_)
 
-
-
-
--- sep : Term → TC Term
--- sep t = do
---   debugPrint "" 2 (strErr "Finding sep for " ∷ strErr (showTerm t) ∷ [])
---   ty ← inferType t
---   debugPrint "" 2 (strErr "sep got type " ∷ strErr (showTerm ty) ∷ [])
---   let ret = (def (quote  identity) [ vArg t ]) -- ⦂ ty
---   return ret
 
 
 
@@ -119,14 +109,13 @@ equivDec (mkHole x _ _) (mkHole y _ _) = x Meta.≟ y
 getMetas : Term → TC (List Hole)
 getMetas t = do
     -- body <- newMeta goalType
-    debugPrint "Hello" 2 (strErr "Ran macro, body var is " ∷ termErr t ∷ [])
+    debugPrint "Leftovers" 2 (strErr "Ran macro, body var is " ∷ termErr t ∷ [])
     -- L.runLeftovers (theMacro body)
       --Now we see what holes are left
     let
         handleMetas : _ → Meta → Data.Maybe.Maybe Hole
         handleMetas ctx m = just (mkHole m (meta m (List.map (λ x → vArg (var x [])) (List.downFrom (length ctx )))) (List.map proj₂ ctx))
-    debugPrint "L" 2 (strErr "After ALLMETAS " ∷ [])
-      -- debugPrint "L" 2 (strErr "ALLMETAS NORM " ∷ List.map termErr normMetas)
+    debugPrint "Leftovers" 2 (strErr "After ALLMETAS " ∷ [])
     let metaList =  (collectFromSubterms
                       (record
                         { onVar = λ _ _ → nothing
@@ -203,18 +192,18 @@ getMacroHoles targetType ctx theMacro = runSpeculative $
     -- Get the type of each hole *in its context*
         types <- VCat.TraversableM.forM {a = Level.zero} {n = length metas} tcMonad (metaVec)
           λ hole → inContext (Hole.context hole ++ ctx) do
-             -- debugPrint "" 2 (strErr "Context : " ∷ strErr (String.intersperse ",, " (List.map (λ x → showTerm (unArg x)) (contextForHole hole))) ∷ [])
-             debugPrint "" 2 (strErr "Getting type of hole " ∷ termErr ( (Hole.hole hole) ) ∷ strErr " !" ∷  [])
+             -- debugPrint "Leftovers" 2 (strErr "Context : " ∷ strErr (String.intersperse ",, " (List.map (λ x → showTerm (unArg x)) (contextForHole hole))) ∷ [])
+             debugPrint "Leftovers" 2 (strErr "Getting type of hole " ∷ termErr ( (Hole.hole hole) ) ∷ strErr " !" ∷  [])
              ty ← inferType (Hole.hole hole)
-             debugPrint "" 2 [ strErr "got type" ]
+             debugPrint "Leftovers" 2 [ strErr "got type" ]
              return ty
         let indexedHoles = Vec.toList (Vec.zip (Vec.allFin (length metas)) metaVec)
-        debugPrint "" 2 (strErr "Indexed holes: " ∷ List.map (λ x → termErr (meta (Hole.holeMeta (proj₂ x)) [])) indexedHoles)
+        debugPrint "Leftovers" 2 (strErr "Indexed holes: " ∷ List.map (λ x → termErr (meta (Hole.holeMeta (proj₂ x)) [])) indexedHoles)
         let
           indexForMeta m =
             Data.Maybe.map proj₁ $
               List.head (List.filter (λ y → m Meta.≟ Hole.holeMeta (proj₂ y)) indexedHoles)
-        debugPrint "Hello" 2 (strErr "normalised MacroBody " ∷ termErr normBody ∷ [])
+        debugPrint "Leftovers" 2 (strErr "normalised MacroBody " ∷ termErr normBody ∷ [])
         return (macroResult normBody _ metaVec types indexForMeta , false) -- ((body , metas , types) , false)
         where
           open import Reflection.Meta as Meta
@@ -227,7 +216,7 @@ metaToArg results cxt t@(meta m _) with (MacroResult.indexFor results m)
     ithHole = Vec.lookup (MacroResult.holes results) i
     numNewInContext = length (Hole.context ithHole)
     argNum = (numNewInContext + ((MacroResult.numMetas results - 1) - toℕ i))
-  debugPrint "" 2 (strErr "Replacing meta " ∷ strErr (showTerm (meta m [])) ∷ strErr " with arg " ∷ strErr (NShow.show argNum) ∷ [])
+  debugPrint "Leftovers" 2 (strErr "Replacing meta " ∷ strErr (showTerm (meta m [])) ∷ strErr " with arg " ∷ strErr (NShow.show argNum) ∷ [])
   return (var argNum (List.map (λ x → vArg (var x [])) (List.upTo numNewInContext)))
 ... | nothing = typeError (strErr "Internal Error: unfound meta " ∷ termErr (meta m []) ∷ strErr " when finding Leftover holes" ∷ [])
 metaToArg _ _ t = return t
@@ -238,10 +227,9 @@ private
   consNm : Name
   consNm = quote cons
 
-open import Leftovers.Internal.LabelMetas
 
-findHoles : ∀ {ℓ} → Set ℓ → (Term → TC ⊤) → TC Term
-findHoles targetSet theMacro =
+findHoles : LSet → (Term → TC ⊤) → TC Term
+findHoles (targetName ⦂⦂ targetSet) theMacro =
   do
     startContext ← getContext
     let startCtxLen = List.length startContext
@@ -253,7 +241,7 @@ findHoles targetSet theMacro =
     result ← getMacroHoles targetType startContext theMacro
     let numMetas = MacroResult.numMetas result
     debugPrint "Leftovers" 2 (strErr "Got holes types " ∷ [])
-    -- debugPrint "Hello" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
+    -- debugPrint "Leftovers" 2 (strErr "Got hole types" ∷ List.map termErr (Vec.toList holeTypes))
     let
       abstractedTypes = (Vec.map (abstractMetaType startCtxLen)
             (Vec.zip (MacroResult.holes result) (MacroResult.types result)))
@@ -265,21 +253,21 @@ findHoles targetSet theMacro =
           (λ h t → con consNm (vArg h ∷ vArg t ∷ []))
           (quoteTerm nil) abstractedTypes
       numHoles =  (Data.Nat.Reflection.toTerm numMetas)
-    debugPrint "Hello" 2 (strErr "Raw sets " ∷ strErr (showTerm sets) ∷ [])
+    debugPrint "Leftovers" 2 (strErr "Raw sets " ∷ strErr (showTerm sets) ∷ [])
     checkType sets (quoteTerm (List Set))
     -- sets ← normalise (rawSets ⦂ (quoteTerm (List Set)))
 
-    -- debugPrint "Hello" 2 (strErr "Made sets " ∷ strErr (showTerm sets) ∷ [])
+    -- debugPrint "Leftovers" 2 (strErr "Made sets " ∷ strErr (showTerm sets) ∷ [])
 
     --This gives us enough information to make a function parameterized over the types of holes
     --We traverse the result of the macro, replacing each meta with a parameter
     --and wrap the hole thing in an n-ary lambda taking parameters of the hole types
     funBody ← everywhere defaultActions (metaToArg result) (MacroResult.body result)
-    debugPrint "" 2 (strErr "got fun body: " ∷ strErr (showTerm funBody) ∷ [])
+    debugPrint "Leftovers" 2 (strErr "got fun body: " ∷ strErr (showTerm funBody) ∷ [])
     -- sepBody ← inContext (List.map vArg (List.reverse $ Vec.toList abstractedTypes) ++ startContext) $ sep funBody
-    -- debugPrint "" 2 (strErr "got fun body " ∷ strErr (showTerm sepBody) ∷ [])
+    -- debugPrint "Leftovers" 2 (strErr "got fun body " ∷ strErr (showTerm sepBody) ∷ [])
     nflam ← specNorm (naryLam numMetas funBody ⦂ def (quote NaryFun) (vArg sets ∷ vArg targetType ∷ []))
-    debugPrint "" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
+    debugPrint "Leftovers" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
     --Produce the function that gives the result of the last macro
     labelPairs ← labelMetas (MacroResult.body result)
     let labels = Vec.map (λ x → labelFor (Hole.holeMeta x) labelPairs) (MacroResult.holes result)
@@ -298,15 +286,16 @@ findHoles targetSet theMacro =
             ∷ vArg targetType
             ∷ vArg (naryLam numMetas (funBody ⦂ targetType)) ∷ []))
     -- unify goal finalResult
-    debugPrint "Hello" 2 (strErr "Final Result " ∷ termErr finalResult ∷ [])
+    debugPrint "Leftovers" 2 (strErr "Final Result " ∷ termErr finalResult ∷ [])
     return finalResult
   where
+    open import Leftovers.Internal.LabelMetas targetName
     naryLam : ℕ → Term → Term
     naryLam 0 x = x
     naryLam (suc n) x = lam visible (abs ("hole" String.++ NShow.show (suc n)) (naryLam n x))
 
 
-findHolesInAll : ∀ {ℓ} → List (Set ℓ) → (Term → TC ⊤) → TC Term
+findHolesInAll : List LSet → (Term → TC ⊤) → TC Term
 findHolesInAll [] theMacro = return (quoteTerm (the (List (∃ WithHoles)) []))
 findHolesInAll (X ∷ XRest) theMacro = do
   hd ← findHoles X theMacro
