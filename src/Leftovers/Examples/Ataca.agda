@@ -43,9 +43,7 @@ plusZero = helper
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
       DoCase "zero" by
-             (do
-               intro'
-               introConstructor')
+             intro' >> introConstructor'
              ⦊ {!!}
       -- Case "suc" by (λ {rec} x → cong suc (rec x)) ⦊ ∎
     helper : ∀ n → n ≡ n + 0

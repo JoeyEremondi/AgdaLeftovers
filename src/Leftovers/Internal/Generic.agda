@@ -5,13 +5,14 @@ open import Reflection.Show using (showName)
 open import Leftovers.Internal.Proofs
 open import Leftovers.Internal.FindHoles
 
-open import Data.String
+open import Data.String hiding (toList ; _++_)
 open import Data.String.Properties using (_==_)
 open import Data.Unit
 open import Data.Product
 open import Data.List.Membership.Propositional
 
-open import Data.List
+open import Data.List as List
+open import Data.List.Properties as List
 open import Relation.Binary.PropositionalEquality
 open import Data.Bool
 open import Data.Nat
@@ -19,6 +20,7 @@ open import Data.Empty
 
 open import Data.Maybe using (Maybe ; just ; nothing)
 
+open import Data.List.Relation.Unary.All
 open import Function
 
 -- data FoundLabel (goals : List LSet) : Maybe (∃[ goal ](goal ∈ goals)) → Set where
@@ -57,7 +59,7 @@ DoCase_by_⦊_ :
     ∀ {IndHyp goals} →
     {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals}
     (tac : Term → TC ⊤) →
-    {@(tactic runSpec (findLeftovers (unLabel goal) tac)) wh : WithHoles (unLabel goal)} →
+    {@(tactic runSpec (findHoles (unLabel goal) tac)) wh : WithHoles (unLabel goal)} →
     MiddleGoalType IndHyp wh mem ->
     Proofs IndHyp goals
 DoCase_by_⦊_ str {IndHyp} {goals} {MkLM goal mem} _ {wh}  = solveMember wh mem
@@ -71,3 +73,33 @@ Case_by_⦊_ :
     MiddleGoalType IndHyp (trivialHole result) mem ->
     Proofs IndHyp goals
 Case_by_⦊_ str {IndHyp} {goals} {MkLM goal mem} result   = solveMember (trivialHole result) mem
+
+
+
+DoAll_by_⦊_ :
+    ∀ {IndHyp goals} →
+    (tac : Term → TC ⊤) →
+    {@(tactic runSpec (findHolesInAll (unLabels goals) tac)) whs : All WithHoles (unLabels goals)} →
+    Proofs IndHyp (concatMap (λ (_ , wh) → subGoalsForWH IndHyp wh) (toList whs )) ->
+    Proofs IndHyp goals
+DoAll_by_⦊_ _ {whs = whs} proofs = solveAll whs proofs
+
+
+
+open import Data.List.Properties using (++-identityʳ )
+
+prove_byInduction_⦊_ : ∀ (A : Set)
+  → (@0 theMacro : Term → TC ⊤)
+  → {@(tactic runSpec (findHoles A theMacro)) wh : WithHoles A}
+  → (holes : Proofs A (List.map (λ (label ⦂⦂ Goal) → label ⦂⦂ (Hyp A → Goal) ) (WithHoles.labeledTypes wh)) )
+  -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
+  → IndProof A
+prove_byInduction_⦊_ A theMacro {wh} holes = pcons wh (subst (Proofs A) (sym (List.++-identityʳ _ )) holes) --  (wh ∷ []) (concatProofs holes)
+
+nextBy_⦊_ : ∀ {IndHyp : Set} {goal : LSet} {goals : List LSet} →
+  (@0 theMacro : Term → TC ⊤) →
+  {@(tactic runSpec (findHoles (unLabel goal) theMacro)) wh : WithHoles (unLabel goal)}
+  → Proofs IndHyp (subGoalsForWH IndHyp wh ++ goals)
+  → Proofs IndHyp (goal ∷ goals)
+nextBy_⦊_  _ {wh} holes
+  = pcons wh holes

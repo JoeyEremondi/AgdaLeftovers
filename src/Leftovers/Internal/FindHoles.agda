@@ -240,8 +240,8 @@ private
 
 open import Leftovers.Internal.LabelMetas
 
-findLeftovers : ∀ {ℓ} → Set ℓ → (Term → TC ⊤) → TC Term
-findLeftovers targetSet theMacro =
+findHoles : ∀ {ℓ} → Set ℓ → (Term → TC ⊤) → TC Term
+findHoles targetSet theMacro =
   do
     startContext ← getContext
     let startCtxLen = List.length startContext
@@ -306,50 +306,9 @@ findLeftovers targetSet theMacro =
     naryLam (suc n) x = lam visible (abs ("hole" String.++ NShow.show (suc n)) (naryLam n x))
 
 
-    -- quoteSets : ∀ {n} → Vec.Vec Term n → Term
-    -- quoteSets Vec.[] = con (quote Level.lift) (vArg (quoteTerm tt) ∷ [])
-    -- quoteSets {n = suc n} (x Vec.∷ v) = (con (quote _,_) (vArg x ∷ vArg (quoteSets v) ∷ [] ))
-
-open import Relation.Nullary
-
--- infixr 10 [_⇒_]
---
-
-open import Data.List.Properties using (++-identityʳ )
-
-prove_byInduction_⦊_ : ∀ (A : Set)
-  → (@0 theMacro : Term → TC ⊤)
-  → {@(tactic runSpec (findLeftovers A theMacro)) wh : WithHoles A}
-  → (holes : Proofs A (List.map (λ (label ⦂⦂ Goal) → label ⦂⦂ (Hyp A → Goal) ) (WithHoles.labeledTypes wh)) )
-  -- → {@(tactic runSpec (subName selfName (λ rec → f {!!}))) x : A}
-  → IndProof A
-prove_byInduction_⦊_ A theMacro {wh} holes = pcons wh (subst (Proofs A) (sym (List.++-identityʳ _ )) holes) --  (wh ∷ []) (concatProofs holes)
-
-by_⦊_ : ∀ {IndHyp : Set} {goal : LSet} {goals : List LSet} →
-  (@0 theMacro : Term → TC ⊤) →
-  {@(tactic runSpec (findLeftovers (unLabel goal) theMacro)) wh : WithHoles (unLabel goal)}
-  → Proofs IndHyp (subGoalsForWH IndHyp wh ++ goals)
-  → Proofs IndHyp (goal ∷ goals)
-by_⦊_  _ {wh} holes
-  = pcons wh holes
-
-doRun : ∀ {A : Set} → (theMacro : TC Term) → {@(tactic run theMacro) x : A} → A
-doRun _ {x} = x
-
-
--- defineBy : ∀ {A : Set }
---   → (selfName : Name)
---   → (theMacro : Term → L.Leftovers ⊤)
---   → {@(tactic runSpec (findLeftovers A theMacro)) (withHoles n types f) : WithHoles A}
---   → (holes : {A} → Product n (toSets types) )
---   → TC ⊤
--- defineBy nm _ {(withHoles _ _ f)} holes = do
---   body ← subName nm (λ rec → f (makeHoles (holes {rec})))
---   defineFun nm [ clause [] [] body ]
---   return tt
-
-open import Relation.Nullary
-
-
-default : ∀ {A : Set} → A → Term → TC ⊤
-default x hole = bindTC (quoteTC x) (unify hole)
+findHolesInAll : ∀ {ℓ} → List (Set ℓ) → (Term → TC ⊤) → TC Term
+findHolesInAll [] theMacro = return (quoteTerm (the (List (∃ WithHoles)) []))
+findHolesInAll (X ∷ XRest) theMacro = do
+  hd ← findHoles X theMacro
+  tl ← findHolesInAll XRest theMacro
+  return (con (quote List._∷_) (vArg hd ∷ vArg tl ∷ []))

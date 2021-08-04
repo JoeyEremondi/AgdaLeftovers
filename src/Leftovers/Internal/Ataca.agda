@@ -28,7 +28,7 @@ DoCase_by_⦊_ :
     ∀ {IndHyp goals} →
     {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals} →
     (tac : Tac ⊤) →
-    {@(tactic runSpec (findLeftovers (unLabel goal) (runTac tac))) wh : WithHoles (unLabel goal)} →
+    {@(tactic runSpec (findHoles (unLabel goal) (runTac tac))) wh : WithHoles (unLabel goal)} →
     MiddleGoalType IndHyp wh mem ->
     Proofs IndHyp goals
 DoCase_by_⦊_ str {IndHyp} {goals} {MkLM goal mem} _ {wh}  = solveMember wh mem

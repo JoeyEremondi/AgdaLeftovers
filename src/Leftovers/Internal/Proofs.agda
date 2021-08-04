@@ -333,3 +333,16 @@ solveMember : ∀ {IndHyp goal goals} →
     MiddleGoalType IndHyp wh member ->
     Proofs IndHyp goals
 solveMember wh member pf with (goals1 , goals2 , refl) ← ∈-∃++ member = solveMiddle wh pf
+
+
+solveAll : ∀ {IndHyp goals} →
+  (whs : All WithHoles (unLabels goals)) →
+  Proofs IndHyp (concatMap (λ (_ , wh ) → subGoalsForWH IndHyp wh) (toList whs))
+  → Proofs IndHyp goals
+solveAll {goals = []} [] pf = pf
+solveAll {goals = x ∷ goals} (wh ∷ whs) pf
+  with (phead , prest) ←
+    unconcatProof
+      (subGoalsForWH _ wh)
+      ((concatMap (λ (_ , wh ) → subGoalsForWH _ wh) (toList whs))) pf =
+  pcons wh (concatProof _ goals phead (solveAll whs prest))
