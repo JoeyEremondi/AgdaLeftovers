@@ -19,9 +19,6 @@ open import Reflection.Show as Show
 open import Function
 open import Data.Bool
 
-prefix : String
-prefix = case (starter == "") of (λ { true → "" ; false → starter ++ " " })
-
 
 private
   record LabelState : Set where
@@ -51,7 +48,7 @@ private
   shortName : Name → String
   shortName n with List.reverse (String.wordsBy (λ c → c Char.≟ '.') (Show.showName n))
   ... | [] = starter
-  ... | s ∷ _ = prefix ++ s
+  ... | s ∷ _ = s
 
   lift : ∀ {A : Set} → TC A → State.StateT LabelState TC A
   lift comp s = comp TC.>>= λ x → return (x , s)
@@ -60,13 +57,13 @@ private
   patString (arg i (con c ps)) = shortName c
   patString (arg i (dot t)) = starter
   patString (arg i (var x)) = starter
-  patString (arg i (lit l)) = prefix ++ Show.showLiteral l
-  patString (arg i (proj f)) = prefix ++ shortName f
+  patString (arg i (lit l)) =  Show.showLiteral l
+  patString (arg i (proj f)) =  shortName f
   patString (arg i (absurd x)) = starter
 
   clauseString : Clause → String
-  clauseString (clause tel ps t) = prefix ++ String.intersperse " " (List.map patString ps)
-  clauseString (absurd-clause tel ps) = prefix ++ String.intersperse " " (List.map patString ps)
+  clauseString (clause tel ps t) =  String.intersperse " " (List.map patString ps)
+  clauseString (absurd-clause tel ps) = String.intersperse " " (List.map patString ps)
 
   beforeAfter : Cxt → BeforeAfter → Cursor → State.StateT LabelState TC ⊤
   beforeAfter _ Before (CClause c) = do
@@ -81,8 +78,8 @@ private
   metaAction : Action Meta
   metaAction Γ m = do
     st ← get
-    lift (debugPrint "Leftovers" 2 (strErr "Logging meta " ∷ termErr (meta m []) ∷ []))
-    modify (addLabel ((m , String.intersperse " " (LabelState.currentTags st))))
+    lift (debugPrint "Leftovers" 2 (strErr "Logging meta " ∷ termErr (meta m []) ∷ strErr " Labels " ∷ strErr (String.intersperse " " (LabelState.currentTags st)) ∷ []))
+    modify (addLabel ((m , String.intersperse " " (starter ∷ LabelState.currentTags st))))
     sReturn m
 
 eachAction : Term →  State.StateT LabelState TC Term
@@ -93,7 +90,8 @@ eachAction t = do
 labelMetas : Term → TC (List (Meta × String))
 labelMetas t =
   contextualEverywhere (record defaultActions {onMeta = metaAction}) beforeAfter (λ _ t → sReturn t) t (St [] [] [])
-  TC.>>= λ (_ , ls) → TC.return (LabelState.metaLabels ls)
+  TC.>>= λ (_ , ls) →
+  TC.return (LabelState.metaLabels ls)
 
 open import Reflection.Meta as M
 

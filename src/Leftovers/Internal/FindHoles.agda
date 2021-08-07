@@ -270,12 +270,18 @@ findHoles (targetName ⦂⦂ targetSet) theMacro =
     debugPrint "Leftovers" 2 (strErr "making fun fun " ∷ strErr (showTerm nflam) ∷ [])
     --Produce the function that gives the result of the last macro
     labelPairs ← labelMetas (MacroResult.body result)
-    let labels = Vec.map (λ x → labelFor (Hole.holeMeta x) labelPairs) (MacroResult.holes result)
-        termLabels = 
-          Vec.foldr
-            (λ _ → Term)
-            (λ h t → con consNm (vArg (lit (string h)) ∷ vArg t ∷ []))
-            (quoteTerm nil) labels
+    termLabelPairs ← quoteTC labelPairs
+    nLabelPairs ← normalise termLabelPairs
+    debugPrint "Leftovers" 2 (strErr "LabelPairs " ∷ termErr nLabelPairs ∷ [])
+    let labels = Vec.toList (Vec.map (λ x → labelFor (Hole.holeMeta x) labelPairs) (MacroResult.holes result))
+    termLabels ← quoteTC labels
+    normLabels ← normalise termLabels
+        -- termLabels =
+        --   Vec.foldr
+        --     (λ _ → Term)
+        --     (λ h t → con consNm (vArg (lit (string h)) ∷ vArg t ∷ []))
+        --     (def (quote [_]) [ vArg (lit (string targetName)) ]) labels
+    debugPrint "Leftovers" 2 (strErr "Labels: " ∷ termErr normLabels ∷ [])
     normSets ← normalise ((def (quote List.zipWith) (vArg (quoteTerm _⦂⦂_) ∷ vArg termLabels ∷ vArg sets ∷ [])))
     let
       finalResult =
