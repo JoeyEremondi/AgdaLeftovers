@@ -79,6 +79,12 @@ runSpec comp goal = do
   debugPrint "Leftovers" 2 (strErr "runSpec generating " ∷ termErr t ∷ [])
 
 
+doSpec : (TC Term) → TC Term
+doSpec comp = do
+  runSpeculative $ do
+    t' ← comp
+    return (t' , false)
+
 
 open import Agda.Builtin.Nat using (_-_)
 
@@ -301,9 +307,27 @@ findHoles (targetName ⦂⦂ targetSet) theMacro =
     naryLam (suc n) x = lam visible (abs ("hole" String.++ NShow.show (suc n)) (naryLam n x))
 
 
+
+MfindHoles : Maybe LSet → (Term → TC ⊤) → TC Term
+MfindHoles (just ls) theMacro = findHoles ls theMacro
+MfindHoles nothing _ = quoteTC (the (MWithHoles nothing) (Level.lift tt))
+
+open import Data.List.Relation.Unary.All
+
 findHolesInAll : List LSet → (Term → TC ⊤) → TC Term
-findHolesInAll [] theMacro = return (quoteTerm (the (List (∃ WithHoles)) []))
+findHolesInAll [] theMacro = quoteTC (the (All WithHoles []) [])
 findHolesInAll (X ∷ XRest) theMacro = do
-  hd ← findHoles X theMacro
-  tl ← findHolesInAll XRest theMacro
-  return (con (quote List._∷_) (vArg hd ∷ vArg tl ∷ []))
+  debugPrint "Leftovers" 2 (strErr "Getting solition for " ∷ strErr (theLabel X) ∷ [])
+  hdTerm ← doSpec (findHoles X theMacro)
+  hd ← unquoteTC {A = WithHoles (unLabel X)} hdTerm
+  debugPrint "Leftovers" 2 (strErr "Got solution " ∷ termErr hdTerm ∷ strErr " for " ∷ strErr (theLabel X) ∷ [])
+  tlTerm ← findHolesInAll XRest theMacro
+  debugPrint "Leftovers" 2 (strErr "Got solution " ∷ termErr tlTerm ∷ strErr " for rest"  ∷ [])
+  tlType ← inferType tlTerm
+  debugPrint "Leftovers" 2 (strErr "Got type " ∷ termErr tlType ∷ strErr " for rest"  ∷ [])
+  tl ← unquoteTC {A = All WithHoles (unLabels XRest)} tlTerm
+  debugPrint "Leftovers" 2 (strErr "Unquoted solution " ∷ termErr tlTerm ∷ strErr " for rest"  ∷ [])
+  let
+    ret : All WithHoles (unLabel X ∷ unLabels XRest)
+    ret = hd ∷ tl
+  quoteTC ret

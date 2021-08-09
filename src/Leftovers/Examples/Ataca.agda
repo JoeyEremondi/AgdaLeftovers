@@ -1,5 +1,5 @@
 
-{-# OPTIONS -v 2 --auto-inline #-}
+{-# OPTIONS -v tac:100 -v Leftovers:3 --auto-inline #-}
 module Leftovers.Examples.Ataca where
 
 open import Leftovers.Ataca
@@ -34,6 +34,7 @@ open import Ataca.Utils
 open import Ataca.Core
 open import Ataca.Tactics
 
+_>>>_ = Ataca.Utils.Monad._>>_ monadTac
 
 -- This one works and passes the termination checker
 plusZero : ∀ n → n ≡ n + 0
@@ -42,10 +43,9 @@ plusZero = helper
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
-      DoCase "zero" by
-             intro' >> introConstructor'
-             ⦊ {!!}
-      -- Case "suc" by (λ {rec} x → cong suc (rec x)) ⦊ ∎
+      -- DoCase "zero" by
+      --        intro' >> introConstructor' ⦊
+     TryAll intro' >>> introConstructor' ⦊ {!!}
     helper : ∀ n → n ≡ n + 0
     -- unquoteDef helper = runIndProof helper proof
 

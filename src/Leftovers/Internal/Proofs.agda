@@ -102,6 +102,15 @@ record WithHoles (A : Set) : Set1 where
   field
     holeyFun : HList types → A
 
+-- WCons : ∀ {A B : Set} → (A → WithHoles B) → WithHoles B
+-- WCons f = withHoles {!!} {!!}
+
+open import Data.Maybe as Maybe using (Maybe ; just ; nothing)
+import Data.Unit.Polymorphic as PUnit
+
+MWithHoles : (A : Maybe LSet) → Set1
+MWithHoles nothing = PUnit.⊤
+MWithHoles (just LA) = WithHoles (unLabel LA)
 
 -- Take an n-ary function, and pack it with the domain type to produce a WithHoles value for the return type
 uncurryWithHoles : ∀ (doms : List LSet) cod → NaryFun (unLabels doms) cod → WithHoles cod
@@ -327,6 +336,13 @@ MiddleGoalType : ∀ (IndHyp : Set) {goal goals} → WithHoles (unLabel goal) �
 MiddleGoalType IndHyp wh member with (goals1 , goals2 , _) ← ∈-∃++ member =
   Proofs IndHyp (subGoalsForWH IndHyp wh ++ goals1 ++ goals2)
 
+
+MMiddleGoalType : ∀ (IndHyp : Set) {goals} (mgoal : Maybe (LabelMatch goals))
+  → MWithHoles (Data.Maybe.map LabelMatch.matchedGoal mgoal) → Set1
+MMiddleGoalType IndHyp (just (MkLM goal member)) wh  with (goals1 , goals2 , _) ← ∈-∃++ member =
+  Proofs IndHyp (subGoalsForWH IndHyp wh ++ goals1 ++ goals2)
+MMiddleGoalType IndHyp {goals} nothing wh  = Proofs IndHyp goals
+
 -- Given a goal occurring somewhere in a goal list, and a holey proof of that goal, and proofs of the remaining goals,
 -- construct a proof of the entire goal list
 solveMember : ∀ {IndHyp goal goals} →
@@ -336,6 +352,13 @@ solveMember : ∀ {IndHyp goal goals} →
     Proofs IndHyp goals
 solveMember wh member pf with (goals1 , goals2 , refl) ← ∈-∃++ member = solveMiddle wh pf
 
+solveMMember : ∀ {IndHyp goals} →
+    (mgoal : Maybe (LabelMatch goals))
+    (wh : MWithHoles (Maybe.map LabelMatch.matchedGoal mgoal)) →
+    MMiddleGoalType IndHyp mgoal wh ->
+    Proofs IndHyp goals
+solveMMember (just (MkLM goal  member)) wh pf = solveMember wh member pf
+solveMMember nothing wh pf = pf
 
 solveAll : ∀ {IndHyp goals} →
   (whs : All WithHoles (unLabels goals)) →
@@ -348,3 +371,5 @@ solveAll {goals = x ∷ goals} (wh ∷ whs) pf
       (subGoalsForWH _ wh)
       ((concatMap (λ (_ , wh ) → subGoalsForWH _ wh) (toList whs))) pf =
   pcons wh (concatProof _ goals phead (solveAll whs prest))
+
+

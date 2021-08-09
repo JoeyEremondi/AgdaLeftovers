@@ -44,9 +44,9 @@ plusZero = helper
     proof : IndProof (∀ n → n ≡ n + 0)
     proof =
       prove (∀ n → n ≡ n + 0 ) byInduction (cases (quote ℕ)) ⦊
-      Case "suc" by (λ rec x → cong suc (recur rec x)) ⦊
-      DoCase "zero" by
-        (default (λ _ → _)) ⦊
+      Case "zero" by
+        (λ _ → refl) ⦊
+      DoCase "suc" by default _ ⦊
       {!!}
 
     helper : ∀ n → n ≡ n + 0

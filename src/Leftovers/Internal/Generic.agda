@@ -52,6 +52,7 @@ getMatch str goals unifGoal with findLabel (subString str) goals
 ... | just ret = do
   goalsTerm ← quoteTC goals
   retTerm ← quoteTC ret
+  debugPrint "Leftovers" 2 (strErr "Found matching LSet " ∷ termErr retTerm ∷ [])
   unify unifGoal retTerm
 
 maybeLamName : Term → TC String
@@ -87,13 +88,13 @@ Case_by_⦊_ str {IndHyp} {goals} {MkLM goal mem} result   = solveMember (trivia
 
 
 
-DoAll_by_⦊_ :
+AllBy_⦊_ :
     ∀ {IndHyp goals} →
     (tac : Term → TC ⊤) →
     {@(tactic runSpec (findHolesInAll goals tac)) whs : All WithHoles (unLabels goals)} →
     Proofs IndHyp (concatMap (λ (_ , wh) → subGoalsForWH IndHyp wh) (toList whs )) ->
     Proofs IndHyp goals
-DoAll_by_⦊_ _ {whs = whs} proofs = solveAll whs proofs
+AllBy_⦊_ _ {whs = whs} proofs = solveAll whs proofs
 
 
 

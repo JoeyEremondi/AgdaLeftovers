@@ -1,6 +1,8 @@
 module Leftovers.Internal.Ataca where
 
+open import Ataca.Utils
 open import Ataca.Core
+
 
 
 open import Reflection
@@ -20,17 +22,54 @@ open import Data.Bool
 open import Data.Nat
 open import Data.Empty
 
-open import Leftovers.Internal.Generic using (getMatch)
-open import Leftovers.Internal.Generic using (Case_by_⦊_) public
+open import Data.List.Relation.Unary.All as All
+
+open import Leftovers.Internal.Generic hiding (DoCase_by_⦊_ ; AllBy_⦊_) public
+
+import Data.Maybe as Maybe
+open import Data.Product
+
 
 DoCase_by_⦊_ :
     (str : String) →
     ∀ {IndHyp goals} →
-    {@(tactic getMatch str goals) (MkLM goal mem) : LabelMatch goals} →
     (tac : Tac ⊤) →
-    {@(tactic runSpec (findHoles (unLabel goal) (runTac tac))) wh : WithHoles (unLabel goal)} →
-    MiddleGoalType IndHyp wh mem ->
+    let
+      mGoalMem = findLabel (subString str) goals
+      mgoal = Maybe.map LabelMatch.matchedGoal mGoalMem
+    in
+    {@(tactic runSpec (MfindHoles mgoal (runTac tac))) wh : MWithHoles mgoal} →
+    MMiddleGoalType IndHyp mGoalMem wh ->
     Proofs IndHyp goals
-DoCase_by_⦊_ str {IndHyp} {goals} {MkLM goal mem} _ {wh}  = solveMember wh mem
+DoCase_by_⦊_ str {IndHyp} {goals}  _ {wh} pf = solveMMember (findLabel (subString str) goals) wh pf
 
 
+TryCase_by_⦊_ :
+    (str : String) →
+    ∀ {IndHyp goals} →
+    (tac : Tac ⊤) →
+    let
+      mGoalMem = findLabel (subString str) goals
+      mgoal = Maybe.map LabelMatch.matchedGoal mGoalMem
+    in
+    {@(tactic runSpec (MfindHoles mgoal (runTac (tac <|> skip)))) wh : MWithHoles mgoal} →
+    MMiddleGoalType IndHyp mGoalMem wh ->
+    Proofs IndHyp goals
+TryCase_by_⦊_ str {IndHyp} {goals} tac {wh} pf =  DoCase_by_⦊_ str {IndHyp} {goals} (tac <|> skip) {wh} pf
+
+DoAll_⦊_ :
+    ∀ {IndHyp goals} →
+    (tac : Tac ⊤) →
+    {@(tactic runSpec (findHolesInAll goals (runTac tac))) whs : All WithHoles (unLabels goals)} →
+    Proofs IndHyp (concatMap (λ (_ , wh) → subGoalsForWH IndHyp wh) (All.toList whs )) ->
+    Proofs IndHyp goals
+DoAll_⦊_ _ {whs = whs} proofs = solveAll whs proofs
+
+
+TryAll_⦊_ :
+    ∀ {IndHyp goals} →
+    (tac : Tac ⊤) →
+    {@(tactic runSpec (findHolesInAll goals (runTac (tac <|> skip)))) whs : All WithHoles (unLabels goals)} →
+    Proofs IndHyp (concatMap (λ (_ , wh) → subGoalsForWH IndHyp wh) (All.toList whs )) ->
+    Proofs IndHyp goals
+TryAll_⦊_ _ {whs = whs} proofs = solveAll whs proofs
