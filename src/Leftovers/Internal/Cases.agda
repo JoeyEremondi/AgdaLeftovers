@@ -59,19 +59,25 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
       mk-cls : Type → Name → TC (Clause )
       mk-cls holeType ctor =
          do
+           -- TODO: need to fix a converntion for ordering of lists/contexts
            debugPrint "Leftovers" 2 (strErr "mk-cls with ctor " ∷ nameErr ctor ∷ [])
            fullyApplied <- fully-applied-pattern ctor
            let
              patArgs = List.map CtorArg.pat fullyApplied
-             patTerm = List.map CtorArg.term fullyApplied
+             -- patTerm = List.map CtorArg.term fullyApplied
              patTypes = List.map CtorArg.type fullyApplied
            extendContexts patTypes do
-               debugPrint "Leftovers" 2 (strErr "before retType " ∷ termErr holeType ∷ strErr "   and   " ∷ termErr (con ctor patTerm) ∷  [])
-               retType ← returnTypeFor holeType (con ctor patTerm)
-               debugPrint "Leftovers" 2 (strErr "retType is  " ∷ termErr retType ∷ [])
+               ctx ← getContext
+               debugPrint "Leftovers" 2 (strErr "Got context " ∷ strErr (String.intersperse ":::" (List.map (λ { (arg i x) → showTerm x}) ctx)) ∷ [])
+               -- debugPrint "Leftovers" 2 (strErr "before retType " ∷ termErr holeType ∷ strErr "   and   " ∷ termErr (con ctor patTerm) ∷  [])
+               -- retType ← freshMeta (sort (lit 0))
+               -- retType ← returnTypeFor holeType (con ctor patTerm)
+               -- debugPrint "Leftovers" 2 (strErr "retType is  " ∷ termErr retType ∷ [])
+               -- debugPrint "Leftovers" 2 (strErr "retType show " ∷ strErr (showTerm retType) ∷ [])
                -- Make the right-hand side in an extended context
                -- with new pattern-match variables
-               rhs ← freshMeta retType
+               rhs ← freshMeta unknown --retType
+               debugPrint "Leftovers" 2 (strErr "Made rhs fresh meta"  ∷ [])
                let
                  teles =
                    List.map
@@ -82,8 +88,8 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
                  ret =
                    (clause
                      teles
-                     [ vArg (con ctor patArgs) ]
-                     (rhs ⦂ retType)
+                     [ vArg (con ctor (reverse patArgs)) ]
+                     rhs -- (rhs ⦂ retType)
                      )
 
                debugPrint "Leftovers" 2  (strErr "retClause" ∷ strErr (showClause ret) ∷ [])

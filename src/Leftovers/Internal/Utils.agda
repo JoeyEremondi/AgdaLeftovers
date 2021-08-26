@@ -92,7 +92,7 @@ genericApp f (arg (arg-info instance′ m) x) = iapp f x
 returnTypeFor : Type → Term → TC Type
 returnTypeFor (pi (arg _ dom) cod) x = do
   debugPrint "Leftovers" 2 (strErr "Checking pattern " ∷ termErr x ∷ strErr "  against type  " ∷ termErr dom ∷ [])
-  checkType x dom
+  -- checkType x dom
   return (app (lam visible cod) x)
 returnTypeFor t x = do
   ldom ← freshMeta (quoteTerm Level)
@@ -129,6 +129,9 @@ record CtorArg : Set where
     term : Arg Term
     type : Arg Type
 
+-- Do the comutation in the context extended with the given list
+-- Tightest bindings are at the end of the list
+-- i.e. if we have (T3 :: T2 :: T1) then T3 can refer to T2 and T1
 extendContexts :  ∀  {ℓ} {A : Set ℓ} → List (Arg Type) → TC A → TC A
 extendContexts [] x = x
 extendContexts (h ∷ t) x = extendContext h (extendContexts t x)
@@ -136,17 +139,29 @@ extendContexts (h ∷ t) x = extendContext h (extendContexts t x)
 -- Given a name, get its type
 -- and generate fresh metas for each argument
 -- e.g. turn (a -> b -> c -> d) into [_ , _ , _]
+-- Leftmost patterns are at the end of the list
+-- So that e.g. the type of the head can refer to elements
+-- in the rest of the list
 fully-applied-pattern : Name → TC (List (CtorArg))
 fully-applied-pattern nm =
   do
     nmType ← getType nm
-    return (full-app-type nmType 0)
+    debugPrint "Leftovers" 2 (strErr "fully-applied-pattern " ∷ nameErr nm ∷ strErr " got type " ∷ termErr nmType ∷ [])
+    (full-app-type nmType 0 (λ _ → []))
   where
-    full-app-type : Type → ℕ → List (CtorArg)
-    full-app-type (pi (arg info dom) (abs s x)) pos =
-      (mkCtorArg
-        (arg info (P.var pos))
-        (arg info (var pos []))
-        (arg info unknown)) ∷ full-app-type x (1 + pos)
+    full-app-type : Type → ℕ → (ℕ → List (CtorArg)) → TC (List (CtorArg))
+    full-app-type (pi (arg info dom) (abs s x)) count accum = do
+      ctorArgType ← freshMeta (sort (lit 0))
+      extendContext (arg info ctorArgType) do
+        let retHead = λ totalNum → (mkCtorArg
+                  (arg info (P.var (totalNum ∸ count)))
+                  (arg info (var (totalNum ∸ count) []))
+                  (arg info ctorArgType))
+        (full-app-type x (1 + count) (λ x → retHead x ∷ accum x))
       -- ((arg info (P.var pos) , arg info (var pos [])) ∷ full-app-type x (1 + pos))
-    full-app-type t pos = []
+    full-app-type t count accum = do
+      debugPrint "Leftovers" 2
+        (strErr "Full app returning: "
+        ∷ strErr (Data.String.intersperse ",  " (List.map (λ x → (showPattern (unArg (CtorArg.pat x))) Data.String.++ " :: " Data.String.++ showTerm (unArg (CtorArg.type x) )) (accum count)))
+        ∷ [])
+      return (accum count)
