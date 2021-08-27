@@ -160,8 +160,9 @@ fully-applied-pattern nm =
         (full-app-type x (1 + count) (λ x → retHead x ∷ accum x))
       -- ((arg info (P.var pos) , arg info (var pos [])) ∷ full-app-type x (1 + pos))
     full-app-type t count accum = do
+      let ret = accum (count)
       debugPrint "Leftovers" 2
         (strErr "Full app returning: "
-        ∷ strErr (Data.String.intersperse ",  " (List.map (λ x → (showPattern (unArg (CtorArg.pat x))) Data.String.++ " :: " Data.String.++ showTerm (unArg (CtorArg.type x) )) (accum count)))
+        ∷ strErr (Data.String.intersperse ",  " (List.map (λ x → (showPattern (unArg (CtorArg.pat x))) Data.String.++ " :: " Data.String.++ showTerm (unArg (CtorArg.type x) )) ret))
         ∷ [])
-      return (accum count)
+      return ret
