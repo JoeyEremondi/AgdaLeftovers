@@ -130,39 +130,49 @@ record CtorArg : Set where
     type : Arg Type
 
 -- Do the comutation in the context extended with the given list
--- Tightest bindings are at the end of the list
+-- Tightest bindings are at the start of the list
 -- i.e. if we have (T3 :: T2 :: T1) then T3 can refer to T2 and T1
 extendContexts :  ∀  {ℓ} {A : Set ℓ} → List (Arg Type) → TC A → TC A
 extendContexts [] x = x
 extendContexts (h ∷ t) x = extendContext h (extendContexts t x)
 
+open import Data.String as String
+open import Data.Bool
+
 -- Given a name, get its type
 -- and generate fresh metas for each argument
 -- e.g. turn (a -> b -> c -> d) into [_ , _ , _]
--- Leftmost patterns are at the end of the list
--- So that e.g. the type of the head can refer to elements
--- in the rest of the list
+-- Leftmost patterns are at the start of the list,
+-- so that thing are in the same order that pat-lam/clause expect
 fully-applied-pattern : Name → TC (List (CtorArg))
 fully-applied-pattern nm =
   do
+    -- x ← quoteTC (the ((ℕ × ⊤) → Bool → ℕ) λ {(x , y) z → x})
+    -- debugPrint "Leftovers" 2 (strErr "Test show term " ∷ strErr (showTerm x)  ∷ [])
+    ctx ← getContext
+    debugPrint "Leftovers" 2 (strErr "Full App Got context " ∷ strErr (String.intersperse ":::" (List.map (λ { (arg i x) → showTerm x}) ctx)) ∷ [])
     nmType ← getType nm
     debugPrint "Leftovers" 2 (strErr "fully-applied-pattern " ∷ nameErr nm ∷ strErr " got type " ∷ termErr nmType ∷ [])
-    (full-app-type nmType 0 (λ _ → []))
-  where
-    full-app-type : Type → ℕ → (ℕ → List (CtorArg)) → TC (List (CtorArg))
-    full-app-type (pi (arg info dom) (abs s x)) count accum = do
-      ctorArgType ← freshMeta (sort (lit 0))
-      extendContext (arg info ctorArgType) do
-        let retHead = λ totalNum → (mkCtorArg
-                  (arg info (P.var (totalNum ∸ count)))
-                  (arg info (var (totalNum ∸ count) []))
-                  (arg info ctorArgType))
-        (full-app-type x (1 + count) (λ x → retHead x ∷ accum x))
-      -- ((arg info (P.var pos) , arg info (var pos [])) ∷ full-app-type x (1 + pos))
-    full-app-type t count accum = do
-      let ret = accum (count)
-      debugPrint "Leftovers" 2
+    ret ← full-app-type nmType (pred (count-arrows nmType))
+    debugPrint "Leftovers" 2
         (strErr "Full app returning: "
         ∷ strErr (Data.String.intersperse ",  " (List.map (λ x → (showPattern (unArg (CtorArg.pat x))) Data.String.++ " :: " Data.String.++ showTerm (unArg (CtorArg.type x) )) ret))
         ∷ [])
-      return ret
+    return ret
+  where
+    -- We need to get the number of arrows, so we know where to start our DeBruijn index
+    count-arrows : Type → ℕ
+    count-arrows (pi (arg info dom) (abs s cod)) = 1 + (count-arrows cod)
+    count-arrows _ = 0
+    full-app-type : Type → ℕ → TC (List (CtorArg))
+    full-app-type (pi (arg info dom) (abs s cod)) debr = do
+      ctorArgType ← freshMeta (sort (lit 0))
+      extendContext (arg info ctorArgType) do
+        let retHead = mkCtorArg
+                  (arg info (P.var debr))
+                  (arg info (var debr []))
+                  (arg info ctorArgType)
+        retTail ← full-app-type cod (pred debr)
+        return (retHead ∷ retTail)
+      -- ((arg info (P.var pos) , arg info (var pos [])) ∷ full-app-type x (1 + pos))
+    full-app-type t count = return []

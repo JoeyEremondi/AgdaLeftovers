@@ -63,7 +63,7 @@ cases typeName hole -- thm-you-hope-is-provable-by-refls
            debugPrint "Leftovers" 2 (strErr "mk-cls with ctor " ∷ nameErr ctor ∷ [])
            fullyApplied <- fully-applied-pattern ctor
            let
-             patArgs = List.map CtorArg.pat fullyApplied
+             patArgs = List.reverse (List.map CtorArg.pat fullyApplied)
              -- patTerm = List.map CtorArg.term fullyApplied
              patTypes = List.map CtorArg.type fullyApplied
            extendContexts patTypes do

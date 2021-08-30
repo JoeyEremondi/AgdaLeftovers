@@ -102,6 +102,11 @@ record WithHoles (A : Set) : Set1 where
   field
     holeyFun : HList types → A
 
+-- data WWithHoles (A : Set) : Set1 where
+--   NoHoles : A → WWithHoles A
+--   HoleCons : (B : Set) → A → WithHoles
+
+
 -- WCons : ∀ {A B : Set} → (A → WithHoles B) → WithHoles B
 -- WCons f = withHoles {!!} {!!}
 

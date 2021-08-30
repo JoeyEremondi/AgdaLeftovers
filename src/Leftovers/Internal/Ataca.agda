@@ -30,6 +30,7 @@ import Data.Maybe as Maybe
 open import Data.Product
 
 
+
 DoCase_by_⦊_ :
     (str : String) →
     ∀ {IndHyp goals} →
